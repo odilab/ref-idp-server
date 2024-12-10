@@ -1,0 +1,64 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/java
+{
+	"name": "ref-idp-Server",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+	"features": {
+		//Use local socket via 
+		//"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers-contrib/features/act:1": {},
+		"ghcr.io/devcontainers/features/java:1": {
+			"installGradle": true,
+			"installMaven": true,
+			"installGroovy": true,
+			"version": "21",
+			"jdkDistro": "tem",
+			"gradleVersion": "7.5.1",
+			"mavenVersion": "latest",
+			"antVersion": "latest",
+			"groovyVersion": "latest"
+		},
+		"ghcr.io/devcontainers-contrib/features/tmux-apt-get:1": {}
+	},
+	"remoteEnv": {
+		"GH_TOKEN": "${localEnv:GH_TOKEN:localEnv:GITHUB_TOKEN}"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"DavidAnson.vscode-markdownlint",
+				"GitHub.copilot",
+				"MS-CEINTL.vscode-language-pack-de",
+				"ms-azuretools.vscode-docker",
+				"ms-vscode-remote.vscode-remote-extensionpack",
+				"GitHub.copilot-chat",
+				"vscjava.vscode-java-pack",
+				"fwcd.kotlin",
+				"formulahendry.code-runner",
+				"github.vscode-github-actions"
+			],
+			"settings": {
+				"files.autoSave": "afterDelay",
+				"editor.smoothScrolling": true,
+				"terminal.integrated.lineHeight": 1.5,
+				"editor.fontLigatures": true,
+				"editor.lineHeight": 1.5,
+				"editor.minimap.enabled": false,
+				"editor.tabSize": 2,
+				"editor.semanticTokenColorCustomizations": {
+					"enabled": true
+				},
+				"editor.semanticHighlighting.enabled": true,
+				"files.eol": "\n",
+				"extensions.ignoreRecommendations": true,
+				"task.problemMatchers.neverPrompt": {
+					"shell": true
+				}
+			}
+		}
+	},
+    "postAttachCommand": "mvn clean install -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dcommit_hash=`git log --pretty=format:'%H' -n 1`"
+}
