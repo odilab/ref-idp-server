@@ -1,0 +1,42 @@
+name: Build Maven Project
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  workflow_dispatch:
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.5.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Maven Action
+        uses: hb0730/maven-action@v1.0.2
+        with:
+          maven-version: 3.9.9
+      - name: Build with Maven
+        if: github.event_name != 'workflow_dispatch'
+        run: mvn clean install -pl idp-server -am
+      - name: Build with Maven (no tests)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mvn clean install -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dcommit_hash=`git log --pretty=format:'%H' -n 1`
+          echo ${{ github.ref }}
