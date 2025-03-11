@@ -17,7 +17,7 @@ on:
 
 env:
   TARGET_ENV: devidp
-  SOURCE_REPOSITORY: ${{ github.repository }}
+  SOURCE_REPOSITORY: gematik/ref-idp-server
 jobs:
   inventory:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/build.yml
     with:
-      repository: ${{ github.repository }}
+      repository: gematik/ref-idp-server
     secrets: inherit
   deploy:
     permissions:
