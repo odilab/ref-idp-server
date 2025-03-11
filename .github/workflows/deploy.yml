@@ -1,0 +1,72 @@
+name: Deploy IDP
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  workflow_dispatch:
+
+env:
+  TARGET_ENV: devidp
+  SOURCE_REPOSITORY: ${{ github.repository }}
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    outputs:
+      server_ip: ${{ steps.hcloud.outputs.server_ip }}
+    steps:
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+      - uses: ./.github/actions/hcloud
+        id: hcloud
+        with:
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          hostvar: ${{ env.TARGET_ENV }}
+  build:
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/build.yml
+    with:
+      repository: ${{ github.repository }}
+    secrets: inherit
+  deploy:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    needs: [build, inventory]
+    steps:
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+      - name: Init SSH Connection
+        id: ssh-connect
+        uses: ./.github/actions/ssh-connect
+        with:
+          hostvar: ${{ env.TARGET_ENV }}
+          server_ip: ${{ needs.inventory.outputs.server_ip }}
+          ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
+      - name: Deploy IDP
+        env:
+          APP_PATH: '/app'
+          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
+        id: ssh-docker
+        shell: bash
+        run: |
+          ssh ${{ env.TARGET_ENV}} "echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin"
+          ssh ${{ env.TARGET_ENV}} 'rm -rdf ${{ env.APP_PATH }} && git clone https://github.com/${{ env.SOURCE_REPOSITORY}}.git ${{ env.APP_PATH }}'
+          ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && echo "appVersion="$(git describe --tags --abbrev=0)"" > ${{ env.APP_PATH }}/.env && echo IDM_ARTIFACT_REGISTRY="local" >> ${{ env.APP_PATH }}/.env'
+          ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && appVersion="$(git describe --tags --abbrev=0)" && docker pull ghcr.io/${{ github.repository }}:$appVersion'
+          ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && appVersion="$(git describe --tags --abbrev=0)" && docker tag ghcr.io/${{ github.repository }}:$appVersion local/idm/idp-server:$appVersion'
+          ssh ${{ env.TARGET_ENV }} 'docker-compose --env-file ${{ env.APP_PATH }}/.env -f ${{ env.APP_PATH }}/docker-compose-ref.yml down || echo "No containers running"'
+          ssh ${{ env.TARGET_ENV }} 'docker-compose --env-file ${{ env.APP_PATH }}/.env -f ${{ env.APP_PATH }}/docker-compose-ref.yml up --detach'
+          ssh ${{ env.TARGET_ENV }} 'docker-compose --env-file ${{ env.APP_PATH }}/.env -f ${{ env.APP_PATH }}/docker-compose-ref.yml ps'

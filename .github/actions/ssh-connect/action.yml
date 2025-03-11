@@ -1,0 +1,58 @@
+name: Init SSH Connection 
+description: Setup SSH Connection to a Server using a provided SSH Key
+author: odilab
+inputs:
+  hostvar:
+    required: true
+    description: "The name of the Host"
+  server_ip:
+    required: true
+    description: "The SSH Server IP"
+  ssh_key:
+    required: true
+    description: "Base64 String SSH Key to use for the server ssh connection"
+outputs:
+  ssh_auth_sock:
+    description: "The SSH_AUTH_SOCK"
+    value: ${{ steps.ssh-agent.outputs.ssh_auth_sock }}
+runs:     
+  using: composite
+  steps:
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+      - name: Init deploy key
+        id: ssh_keys
+        if: ${{ inputs.ssh_key }}
+        env:
+          PRIVATE_KEY: ${{ inputs.ssh_key }}
+          PRIVATE_KEY_PATH: ~/.ssh/id_deploy
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo ${{ env.PRIVATE_KEY }}| base64 -d > ${{ env.PRIVATE_KEY_PATH }} && chmod 600 ${{ env.PRIVATE_KEY_PATH }}
+          ssh-keygen -f ${{ env.PRIVATE_KEY_PATH }} -y > ${{ env.PRIVATE_KEY_PATH }}.pub && chmod 644 ${{ env.PRIVATE_KEY_PATH }}.pub
+      - name: Write SSH config
+        id: write-ssh-config
+        if: ${{ inputs.ssh_key }}
+        shell: bash
+        env:
+          SERVER_IP: ${{ inputs.server_ip }}
+          HOSTVAR: ${{ inputs.hostvar }}
+          PRIVATE_KEY_PATH: ~/.ssh/id_deploy
+        run: |
+          ssh-keyscan ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          echo "Host ${{ env.HOSTVAR }}" > ~/.ssh/config
+          echo "  HostName ${{ env.SERVER_IP }}" >> ~/.ssh/config
+          echo "  User root" >> ~/.ssh/config
+          echo "  IdentityFile ${{ env.PRIVATE_KEY_PATH }}" >> ~/.ssh/config
+      - name: Eval Agent
+        if: ${{ inputs.ssh_key }}
+        id: ssh-agent
+        shell: bash
+        env:
+          PRIVATE_KEY_PATH: ~/.ssh/id_deploy
+        run: |
+          eval "$(ssh-agent -s)"
+          export SSH_AUTH_SOCK
+          ssh-add ${{ env.PRIVATE_KEY_PATH }}
+          echo "ssh_auth_sock=$SSH_AUTH_SOCK" >> $GITHUB_OUTPUT

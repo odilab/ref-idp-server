@@ -1,0 +1,46 @@
+name: HCloud Inventory 
+description: Outputs the IP of a given Servername from an Ansible Inventory, and sets up SSH keys for the server if key is provided
+author: odilab
+inputs:
+  hostvar:
+    required: true
+    description: "The name of the host in the Ansible Inventory"
+  hcloud_token:
+    required: true
+    description: "The Hetzner Cloud API Token"
+outputs:
+  server_ip:
+    description: "The IP of the server"
+    value: ${{ steps.host.outputs.server_ip }}
+runs:     
+  using: composite
+  steps:
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Get Inventory
+        id: host
+        shell: bash
+        env:
+          HCLOUD_TOKEN: ${{ inputs.hcloud_token }}
+          HOSTVAR: ${{ inputs.hostvar }}
+        run: |
+          mkdir -p /tmp/ansible
+          cd /tmp/ansible
+          echo 'ansible' > requirements.txt
+          echo 'hcloud' >> requirements.txt
+          echo '---' > requirements.yml
+          echo 'collections:' >> requirements.yml
+          echo '  - hetzner.hcloud' >> requirements.yml
+          echo 'plugin: hetzner.hcloud.hcloud' > hcloud.yml
+          pip install -r requirements.txt
+          ansible-galaxy install -r requirements.yml
+          echo "server_ip=$(ansible-inventory -i hcloud.yml --list | jq "._meta.hostvars.${{ env.HOSTVAR }}.ansible_host")" >> $GITHUB_OUTPUT
+      - name: Output Server IP
+        id: output
+        shell: bash
+        env:
+          SERVER_IP: ${{ steps.host.outputs.server_ip }}
+        run: echo "SERVER_IP=${{ env.SERVER_IP }}" >> $GITHUB_ENV

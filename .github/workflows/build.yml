@@ -1,0 +1,102 @@
+name: Build Maven Project
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '.devcontainer/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      repository:
+        required: true
+        type: string
+    outputs:
+      latest_tag:
+        description: "The first job output"
+        value: ${{ jobs.build.outputs.latest_tag }}
+      latest_image:
+        description: "The second job output"
+        value: ${{ jobs.build.outputs.latest_image }}
+env:
+  SOURCE_REPOSITORY: ${{ github.repository }}
+jobs:
+  build:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    outputs:
+      latest_tag: ${{ steps.tag.outputs.LATEST_TAG }}
+      latest_image: ${{ steps.image.outputs.LATEST_IMAGE }}
+    steps:
+      - name: set SOURCE_REPOSITORY for workflow_call
+        if: ${{ inputs.repository }}
+        run: echo "SOURCE_REPOSITORY=${{ inputs.repository }}" >> $GITHUB_ENV
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          fetch-tags: 'true'
+      - name: Set LATEST_TAG
+        id: tag
+        run: echo "LATEST_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+      - name: Check existing release
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "LAST_RELEASE=$(gh release view ${{ steps.tag.outputs.LATEST_TAG }} --repo ${{ github.repository }} --json tagName --jq '.tagName')" > $GITHUB_ENV
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.5.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build with Maven (no tests)
+        run: |
+          mvn clean install -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dcommit_hash=`git log --pretty=format:'%H' -n 1`
+          echo "BUILDPATH=$(pwd)" >> $GITHUB_ENV
+      - name: Create Release
+        id: create_release
+        if: ${{ steps.tag.outputs.LATEST_TAG  !=  env.LAST_RELEASE }}
+        uses: actions/create-release@v1.1.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.LATEST_TAG }}
+          release_name: Release ${{ steps.tag.outputs.LATEST_TAG }}
+          draft: false
+          prerelease: false
+      - name: Upload Asset
+        uses: softprops/action-gh-release@v2
+        if: ${{ steps.tag.outputs.LATEST_TAG  !=  env.LAST_RELEASE }}
+        with:
+          name: idp-server-${{ steps.tag.outputs.LATEST_TAG }}.jar
+          tag_name: ${{ steps.tag.outputs.LATEST_TAG }}
+          repository: ${{ github.repository }}
+          files: |
+            ${{ env.BUILDPATH }}/idp-server/target/idp-server-${{ steps.tag.outputs.LATEST_TAG }}.jar
+            ${{ env.BUILDPATH }}/idp-client/target/idp-client-${{ steps.tag.outputs.LATEST_TAG }}.jar
+            ${{ env.BUILDPATH }}/idp-commons/target/idp-commons-${{ steps.tag.outputs.LATEST_TAG }}.jar
+            ${{ env.BUILDPATH }}/idp-crypto/target/idp-crypto-${{ steps.tag.outputs.LATEST_TAG }}.jar
+      - name: Push to GHCR
+        if: ${{ steps.tag.outputs.LATEST_TAG  !=  env.LAST_RELEASE }}
+        env:
+          LATEST_TAG: ${{ steps.tag.outputs.LATEST_TAG }}
+        id: image
+        run: |
+          docker tag local/idm/idp-server:${{ env.LATEST_TAG }} ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}
+          docker tag local/idm/idp-server:${{ env.LATEST_TAG }} ghcr.io/${{ github.repository }}:latest
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          docker push --all-tags ghcr.io/${{ github.repository }}
+          echo "LATEST_IMAGE=ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}" >> $GITHUB_OUTPUT
