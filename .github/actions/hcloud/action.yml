@@ -37,7 +37,7 @@ runs:
           echo 'plugin: hetzner.hcloud.hcloud' > hcloud.yml
           pip install -r requirements.txt
           ansible-galaxy install -r requirements.yml
-          echo "server_ip=$(ansible-inventory -i hcloud.yml --list | jq "._meta.hostvars.${{ env.HOSTVAR }}.ansible_host")" >> $GITHUB_OUTPUT
+          echo "server_ip=$(ansible-inventory -i hcloud.yml --host ${{ env.HOSTVAR }}| | jq .ansible_host )" >> $GITHUB_OUTPUT
       - name: Output Server IP
         id: output
         shell: bash
