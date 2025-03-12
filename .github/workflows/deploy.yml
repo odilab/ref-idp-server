@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  TARGET_ENV: devidp
+  TARGET_ENV: ref-idp-server
   SOURCE_REPOSITORY: gematik/ref-idp-server
 jobs:
   inventory:
@@ -59,12 +59,14 @@ jobs:
         env:
           APP_PATH: '/app'
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
+          IDP_SERVER_URL: ${{ needs.inventory.outputs.server_ip }}
         id: ssh-docker
         shell: bash
         run: |
           ssh ${{ env.TARGET_ENV}} "echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin"
           ssh ${{ env.TARGET_ENV}} 'rm -rdf ${{ env.APP_PATH }} && git clone https://github.com/${{ env.SOURCE_REPOSITORY}}.git ${{ env.APP_PATH }}'
           ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && echo "appVersion="$(git describe --tags --abbrev=0)"" > ${{ env.APP_PATH }}/.env && echo IDM_ARTIFACT_REGISTRY="local" >> ${{ env.APP_PATH }}/.env'
+          ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && echo IDP_SERVER_URL="${{ env.IDP_SERVER_URL }}" >> ${{ env.APP_PATH }}/.env'
           ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && appVersion="$(git describe --tags --abbrev=0)" && docker pull ghcr.io/${{ github.repository }}:$appVersion'
           ssh ${{ env.TARGET_ENV}} 'cd ${{ env.APP_PATH }} && appVersion="$(git describe --tags --abbrev=0)" && docker tag ghcr.io/${{ github.repository }}:$appVersion local/idm/idp-server:$appVersion'
           ssh ${{ env.TARGET_ENV }} 'docker-compose --env-file ${{ env.APP_PATH }}/.env -f ${{ env.APP_PATH }}/docker-compose-ref.yml down || echo "No containers running"'
