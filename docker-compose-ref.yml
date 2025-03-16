@@ -1,5 +1,3 @@
-version: '3.7'
-
 # Common Health Check Properties
 x-healthcheck-config: &healthcheck-ref
   # Expects that the Spring Actuator port is 8180
