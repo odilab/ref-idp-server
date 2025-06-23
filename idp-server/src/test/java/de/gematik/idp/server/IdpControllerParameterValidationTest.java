@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.server;
@@ -53,7 +57,7 @@ import kong.unirest.core.HttpRequest;
 import kong.unirest.core.HttpResponse;
 import kong.unirest.core.JsonNode;
 import kong.unirest.core.MultipartBody;
-import kong.unirest.core.Unirest;
+import kong.unirest.core.UnirestInstance;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jose4j.jwt.JwtClaims;
@@ -88,6 +92,7 @@ class IdpControllerParameterValidationTest {
   @Autowired private IdpKey idpEnc;
   private IdpClient idpClient;
   private PkiIdentity pkiIdentity;
+  private UnirestInstance unirestInstance;
 
   @BeforeEach
   public void setup(
@@ -100,7 +105,7 @@ class IdpControllerParameterValidationTest {
             .build();
 
     idpClient.initialize();
-
+    unirestInstance = idpClient.getAuthenticatorClient().getUnirestInstance();
     pkiIdentity = egkIdentity;
   }
 
@@ -206,7 +211,7 @@ class IdpControllerParameterValidationTest {
   @Test
   void getAuthenticationChallenge_missingState_invalidClientId_invalidRedirect_shouldGiveError() {
     final GetRequest getRequest =
-        Unirest.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
+        unirestInstance.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
 
     getChallengeParameterMap.stream()
         .map(getInvalidationFunction("client_id", "0"))
@@ -221,7 +226,7 @@ class IdpControllerParameterValidationTest {
   @Test
   void getAuthenticationChallenge_missingClientId_invalidRedirect_shouldGiveError() {
     final GetRequest getRequest =
-        Unirest.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
+        unirestInstance.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
 
     getChallengeParameterMap.stream()
         .map(getInvalidationFunction("redirect_uri", "attack"))
@@ -411,7 +416,7 @@ class IdpControllerParameterValidationTest {
   private GetRequest buildGetChallengeRequest(
       final UnaryOperator<Entry<String, String>> entryStringFunction) {
     final GetRequest getRequest =
-        Unirest.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
+        unirestInstance.get("http://localhost:" + port + IdpConstants.BASIC_AUTHORIZATION_ENDPOINT);
 
     getChallengeParameterMap.stream()
         .map(entryStringFunction)
@@ -426,7 +431,8 @@ class IdpControllerParameterValidationTest {
     final AtomicReference<MultipartBody> resultPtr = new AtomicReference<>();
     idpClient.setBeforeTokenMapper(
         request -> {
-          final MultipartBody post = Unirest.post(request.getUrl()).fields(Collections.emptyMap());
+          final MultipartBody post =
+              unirestInstance.post(request.getUrl()).fields(Collections.emptyMap());
           request.multiParts().stream()
               .map(part -> Pair.of(part.getName(), part.getValue().toString()))
               .map(entryStringFunction)

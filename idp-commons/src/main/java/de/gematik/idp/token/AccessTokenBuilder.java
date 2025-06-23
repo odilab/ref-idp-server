@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.token;
@@ -132,8 +136,13 @@ public class AccessTokenBuilder {
     claimsMap.put(JWT_ID.getJoseName(), Nonce.getNonceAsHex(IdpConstants.JTI_LENGTH));
     Object amrValue =
         authenticationToken.getBodyClaim(AUTHENTICATION_METHODS_REFERENCE).orElse(getAmrString());
-    // workaround for authenticator with substantial, TIIAM-178
-    if (amrValue.equals("urn:telematik:auth:mEW")) {
+    // workaround for authentication with substantial or sso, TIIAM-178
+    // maybe it would be better when auth code contains just ["mfa"]
+    final Set<String> amrValuesOfSectoralIdToken =
+        Set.of("urn:telematik:auth:eGK", "urn:telematik:auth:mEW", "urn:telematik:auth:sso");
+
+    if ((amrValue instanceof final String amrValueString)
+        && (amrValuesOfSectoralIdToken.contains(amrValueString))) {
       amrValue = new String[] {"mfa"};
     }
     claimsMap.put(AUTHENTICATION_METHODS_REFERENCE.getJoseName(), amrValue);

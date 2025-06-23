@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,13 +12,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.authentication;
 
 import de.gematik.idp.exceptions.IdpRuntimeException;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -68,5 +74,14 @@ public class UriUtils {
     }
 
     return uri.getScheme() + "://" + uri.getHost() + uri.getPath();
+  }
+
+  public static boolean isValidUrl(final String url) {
+    try {
+      final URL ignored = URI.create(url).toURL();
+      return true;
+    } catch (final MalformedURLException | IllegalArgumentException e) {
+      return false;
+    }
   }
 }

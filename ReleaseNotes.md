@@ -1,3 +1,61 @@
+# Release 29.2.7
+
+- adjust POMs to meet Maven Central standards
+- update dependencies
+
+# Release 29.2.5
+
+- add a test case for eRezept auth servers entity statement
+- update dependencies
+
+# Release 29.2.4
+
+- refactoring to remove commons-validator due to vulnerability CVE-2025-48734 and others
+- update dependencies
+
+# Release 29.2.2
+
+- update almost expired certificates
+- update dependencies
+
+# Release 29.2.1
+
+- bugfix ANFIM-64:retrieveDiscoveryDocument failed on missing endpoints and given fixedIdpUrl
+- update dependencies
+
+# Release 29.2.0
+
+- refactor setting/printing log level - see [idp-server logging](README.md#idp-server-logging)
+- fix unirest instance in unit tests
+- fix content of tokenflow files on gitHub pages
+- update almost expired certificates
+- update dependencies
+
+# Release 29.1.9
+
+- fix tokenflow files on gitHub pages
+- update dependencies
+
+# Release 29.1.8
+
+- fix tokenflow files containing error "HTTP/1.1 request does not contain Host header"
+- update dependencies
+
+# Release 29.1.7
+
+- fix https://github.com/gematik/ref-idp-server/issues/43
+- skip docker build as default
+- add ability to customize IdpClient Unirest instance
+- remove deprecated version-string in docker-compose file
+
+# Release 29.1.5
+
+- update TSL
+- add testcase for auth with substantial and SSO
+- update test certificate
+- remove module idp-operations
+- update dependencies and refactor deprecated code
+
 # Release 29.1.0
 
 - remove fasttrack functionality

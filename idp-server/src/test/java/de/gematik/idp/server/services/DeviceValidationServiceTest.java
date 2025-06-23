@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.server.services;
@@ -58,7 +62,8 @@ class DeviceValidationServiceTest {
   void testValidationRepository() {
     final DeviceValidationData expected =
         deviceValidationRepository.save(createDeviceValidationData());
-    final DeviceValidationData validationData = deviceValidationRepository.getOne(expected.getId());
+    final DeviceValidationData validationData =
+        deviceValidationRepository.getReferenceById(expected.getId());
     assertThat(validationData).usingRecursiveComparison().isEqualTo(expected);
     final Optional<DeviceValidationData> findData = findDeviceValidationDataFromRepo(expected);
     assertThat(findData).isPresent();

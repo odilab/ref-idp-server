@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.test.steps.helpers;
@@ -37,20 +41,12 @@ public class IdpTestEnvironmentConfigurator extends TestEnvironmentConfigurator 
   private static final String IDP_LOCAL_DISCDOC = "IDP_LOCAL_DISCDOC";
   private static final String DISCOVERY_URL_TEMPLATE =
       "http://idp" + /*127.0.0.1:%d*/ "/.well-known/openid-configuration";
-  private static final String AUTHORIZATION_URL_SEKTORAL_IDP_TEMPLATE =
-      "http://idpsektoral" + /*127.0.0.1:%d*/ "/authorization";
-  private static final String ENV_AUTHORIZATION_URL_SEKTORAL_IDP = "AUTHORIZATION_URL_SEKTORAL_IDP";
   private static String DISCOVERY_URL = null;
-  private static String AUTHORIZATION_URL_SEKTORAL_IDP;
 
   private static boolean initialized = false;
 
   public static synchronized String getDiscoveryDocumentURL() {
     return DISCOVERY_URL;
-  }
-
-  public static synchronized String getAuthorizationUrlSektoralIdpURL() {
-    return AUTHORIZATION_URL_SEKTORAL_IDP;
   }
 
   public static synchronized boolean isRbelLoggerActive() {
@@ -91,21 +87,13 @@ public class IdpTestEnvironmentConfigurator extends TestEnvironmentConfigurator 
         Integer.parseInt(
             TigerGlobalConfiguration.resolvePlaceholders(
                 TigerGlobalConfiguration.readString("tiger.ports.idp")));
-    final int sektoralIdpPort =
-        Integer.parseInt(
-            TigerGlobalConfiguration.resolvePlaceholders(
-                TigerGlobalConfiguration.readString("tiger.ports.idpsektoral")));
     log.info("serverPort: {}", serverPort);
-    log.info("sektoralIdpPort: {}", sektoralIdpPort);
     if (idpLocalDiscdoc == null || idpLocalDiscdoc.isBlank()) {
       if (getProperty(IDP_SERVER) != null) {
         log.info("Environment variable IDP_SERVER was set to: {}", getProperty(IDP_SERVER));
         DISCOVERY_URL = getProperty(IDP_SERVER);
-        AUTHORIZATION_URL_SEKTORAL_IDP = getProperty(ENV_AUTHORIZATION_URL_SEKTORAL_IDP);
       } else {
         DISCOVERY_URL = String.format(DISCOVERY_URL_TEMPLATE, serverPort);
-        AUTHORIZATION_URL_SEKTORAL_IDP =
-            String.format(AUTHORIZATION_URL_SEKTORAL_IDP_TEMPLATE, sektoralIdpPort);
       }
     } else {
       try {
@@ -118,7 +106,6 @@ public class IdpTestEnvironmentConfigurator extends TestEnvironmentConfigurator 
     log.info("IDP_SERVER               : {}", getSystemEnvString(IDP_SERVER));
     log.info("IDP_SERVER_PORT          : {}", serverPort);
     log.info("IDP DISC DOC URI         : {}", DISCOVERY_URL);
-    log.info("AUTHORIZATION_URL_SEKTORAL_IDP  : {}", AUTHORIZATION_URL_SEKTORAL_IDP);
     initialized = true;
   }
 }

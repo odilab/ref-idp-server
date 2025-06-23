@@ -1,0 +1,30 @@
+idp:
+  version: ${project.version}
+
+ports:
+  idp: ${free.port.100}
+
+tigerProxy:
+  adminPort: ${free.port.201}
+  proxyPort: ${free.port.200}
+
+lib:
+  activateWorkflowUI: false
+  rbelPathDebugging: false
+
+additionalConfigurationFiles:
+  - filename: tc_properties-local.yaml
+    baseKey: fed
+
+servers:
+  idp:
+    type: externalJar
+    healthcheckUrl: http://127.0.0.1:${tiger.ports.idp}
+    externalJarOptions:
+      arguments:
+        - --server.port=${tiger.ports.idp}
+      workingDir: ../idp-server/target
+    source:
+      - local://idp-server-${tiger.idp.version}.jar
+    startupTimeoutSec: 60
+    active: true

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.test.steps.helpers;
@@ -203,7 +207,8 @@ public class KeyAndCertificateStepsHelper {
     // check for self signed
     assertThatThrownBy(() -> cert.verify(cert.getPublicKey()))
         .isInstanceOf(SignatureException.class);
-    assertThat(cert.getSubjectX500Principal().getName()).isNotEqualTo(cert.getIssuerDN().getName());
+    assertThat(cert.getSubjectX500Principal().getName())
+        .isNotEqualTo(cert.getIssuerX500Principal().getName());
 
     // TODO pkilib check revocation of cert once pkilib is able to do it
 

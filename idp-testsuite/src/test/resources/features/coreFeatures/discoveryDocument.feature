@@ -1,5 +1,5 @@
 #
-# Copyright 2023 gematik GmbH
+# Copyright (Date see Readme), gematik GmbH
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# *******
+#
+# For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
 #
 
 @PRODUKT:IDP-D
@@ -89,7 +93,6 @@ Feature: Fordere Discovery Dokument an
   @AFO-ID:A_20698 @AFO-ID:A_20591-01 @AFO-ID:A_20439 @AFO-ID:A_20458-02 @AFO-ID:A_21429-02
   @Approval @Ready
   @TESTSTUFE:4
-  @OpenBug
   Scenario: Disc - Dokument body claims sind korrekt
 
   ```
@@ -103,7 +106,7 @@ Feature: Fordere Discovery Dokument an
 
     Given TGR clear recorded messages
     And IDP I request the discovery document
-    And TGR find request to path "/.well-known/openid-configuration"
+    And TGR find first request to path "/.well-known/openid-configuration"
     Then TGR current response at "$.body.body" matches as JSON:
         """
           { acr_values_supported:                   ["gematik-ehealth-loa-high"],
@@ -243,7 +246,7 @@ Feature: Fordere Discovery Dokument an
     And IDP I extract the body claims
 
     When IDP I request the uri from claim "<claim>" with method GET and status 200
-    And TGR find request to path "/.well-known/openid-configuration"
+    And TGR find first request to path "/.well-known/openid-configuration"
     And TGR find next request to path ".*"
     Then TGR current response at "$.body.keys.[?(@.kid.content == 'puk_idp_enc')]" matches as JSON:
     """

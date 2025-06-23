@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.test.steps;
@@ -73,7 +77,8 @@ public class IdpStepsBaseTest {
     final byte[] data =
         IOUtils.toByteArray(
             getClass()
-                .getResourceAsStream("/certs/valid/80276883110000129068-C_SMCB_HCI_AUT_E256.p12"));
+                .getResourceAsStream(
+                    "/certs/valid/80276883110000129068-2-C_SMCB_HCI_AUT_E256.p12"));
     final X509Certificate cert = CryptoLoader.getCertificateFromP12(data, "00");
     assertThat(cert).isNotNull();
     final IdpKeyDescriptor desc = IdpKeyDescriptor.constructFromX509Certificate(cert, "test");

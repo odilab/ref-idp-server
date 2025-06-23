@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.server;
@@ -61,6 +65,7 @@ import kong.unirest.core.HttpResponse;
 import kong.unirest.core.MultipartBody;
 import kong.unirest.core.Unirest;
 import kong.unirest.core.UnirestException;
+import kong.unirest.core.UnirestInstance;
 import org.apache.http.HttpHeaders;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.json.JSONException;
@@ -88,6 +93,7 @@ class TokenRetrievalTest {
   @Autowired private IdpConfiguration idpConfiguration;
   private IdpClient idpClient;
   private PkiIdentity egkUserIdentity;
+  private UnirestInstance unirestInstance;
   @LocalServerPort private int localServerPort;
 
   @BeforeEach
@@ -101,7 +107,7 @@ class TokenRetrievalTest {
             .build();
 
     idpClient.initialize();
-
+    unirestInstance = idpClient.getAuthenticatorClient().getUnirestInstance();
     egkUserIdentity = egkIdentity;
   }
 
@@ -429,7 +435,8 @@ class TokenRetrievalTest {
   }
 
   @Test
-  void testLoginHba(@Filename("80276883110000129084-C_HP_AUT_E256") final PkiIdentity failIdentity)
+  void testLoginHba(
+      @Filename("80276883110000129084-2-C_HP_AUT_E256") final PkiIdentity failIdentity)
       throws UnirestException {
     final PkiIdentity smcbIdentity =
         PkiIdentity.builder()
@@ -447,7 +454,8 @@ class TokenRetrievalTest {
   void stateParameterNotGivenInInitialRequest_ServerShouldGiveError() throws UnirestException {
     idpClient.setBeforeAuthorizationMapper(
         request ->
-            Unirest.get(request.getUrl().replaceFirst("&state=[\\w-_.~]*", ""))
+            unirestInstance
+                .get(request.getUrl().replaceFirst("&state=[\\w-_.~]*", ""))
                 .headers(getAllHeaderElementsAsMap(request)));
 
     assertThatThrownBy(() -> idpClient.login(egkUserIdentity))
@@ -509,7 +517,7 @@ class TokenRetrievalTest {
 
   @Test
   void resignedChallengeTokenWithDifferentIdentity_ShouldGiveServerError(
-      @Filename("80276883110000129084-C_HP_AUT_E256.p12") final PkiIdentity notTheServerIdentity)
+      @Filename("80276883110000129084-2-C_HP_AUT_E256.p12") final PkiIdentity notTheServerIdentity)
       throws UnirestException {
     final IdpJwtProcessor differentSigner = new IdpJwtProcessor(notTheServerIdentity);
     idpClient.setAuthorizationResponseMapper(
@@ -534,7 +542,7 @@ class TokenRetrievalTest {
 
   @Test
   void resignedAuthenticationTokenWithDifferentIdentity_ShouldGiveServerError(
-      @Filename("80276883110000129084-C_HP_AUT_E256") final PkiIdentity notTheServerIdentity)
+      @Filename("80276883110000129084-2-C_HP_AUT_E256") final PkiIdentity notTheServerIdentity)
       throws UnirestException {
     final IdpJwtProcessor differentSigner = new IdpJwtProcessor(notTheServerIdentity);
     idpClient.setAuthenticationResponseMapper(

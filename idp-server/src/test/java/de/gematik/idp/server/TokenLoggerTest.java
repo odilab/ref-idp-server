@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.server;
@@ -39,7 +43,8 @@ import de.gematik.rbellogger.renderer.RbelHtmlRenderer;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.KeyPair;
 import java.util.HashMap;
@@ -415,9 +420,9 @@ class TokenLoggerTest {
 
   @BeforeEach
   public void startup(
-      @PkiKeyResolver.Filename("80276883110000018680-C_CH_AUT_E256.p12")
+      @PkiKeyResolver.Filename("80276883110000161754-C_CH_AUT_E256.p12")
           final PkiIdentity clientIdentity,
-      @PkiKeyResolver.Filename("80276883110000129084-C_HP_AUT_E256.p12")
+      @PkiKeyResolver.Filename("80276883110000129084-2-C_HP_AUT_E256.p12")
           final PkiIdentity smcbIdentity) {
     rbelLogger =
         RbelLogger.build(
@@ -449,7 +454,7 @@ class TokenLoggerTest {
     this.smcbIdentity = smcbIdentity;
   }
 
-  private void initializeWiremockCapture() throws MalformedURLException {
+  private void initializeWiremockCapture() throws MalformedURLException, URISyntaxException {
     rbelLogger.clearAllMessages();
 
     wiremockCapture =
@@ -458,7 +463,7 @@ class TokenLoggerTest {
             .proxyFor("http://localhost:" + localServerPort)
             .build()
             .initialize();
-    wiremockPort.set(new URL(wiremockCapture.getProxyAdress()).getPort());
+    wiremockPort.set(new URI(wiremockCapture.getProxyAdress()).toURL().getPort());
 
     ReflectionTestUtils.setField(
         authenticationChallengeBuilder, "uriIdpServer", wiremockCapture.getProxyAdress());
@@ -477,7 +482,7 @@ class TokenLoggerTest {
   }
 
   @Test
-  void writeAllTokensToFile() throws IOException {
+  void writeAllTokensToFile() throws IOException, URISyntaxException {
     performAndWriteFlow(
         () -> {
           patchIdpUrls(idpClient);
@@ -550,7 +555,8 @@ class TokenLoggerTest {
   }
 
   private void performAndWriteFlow(
-      final Runnable performer, final String filename, final String title) throws IOException {
+      final Runnable performer, final String filename, final String title)
+      throws IOException, URISyntaxException {
     try {
       initializeWiremockCapture();
 

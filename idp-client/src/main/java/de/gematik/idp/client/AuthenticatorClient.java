@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp.client;
@@ -74,8 +78,10 @@ import kong.unirest.core.HttpResponse;
 import kong.unirest.core.JsonNode;
 import kong.unirest.core.MultipartBody;
 import kong.unirest.core.Unirest;
+import kong.unirest.core.UnirestInstance;
 import kong.unirest.core.json.JSONObject;
 import kong.unirest.jackson.JacksonObjectMapper;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.jose4j.jwt.JwtClaims;
 import org.springframework.http.MediaType;
@@ -84,11 +90,16 @@ import org.springframework.http.MediaType;
 public class AuthenticatorClient {
 
   private static final String USER_AGENT = "IdP-Client";
+  @Getter private final UnirestInstance unirestInstance;
 
   public AuthenticatorClient() {
-    Unirest.config().reset();
-    Unirest.config().followRedirects(false);
-    Unirest.config().setObjectMapper(new JacksonObjectMapper());
+    this.unirestInstance = Unirest.spawnInstance();
+    unirestInstance.config().followRedirects(false);
+    unirestInstance.config().setObjectMapper(new JacksonObjectMapper());
+  }
+
+  public AuthenticatorClient(final UnirestInstance unirestInstance) {
+    this.unirestInstance = unirestInstance;
   }
 
   public static Map<String, String> getAllHeaderElementsAsMap(final HttpRequest request) {
@@ -114,7 +125,8 @@ public class AuthenticatorClient {
     final String scope = String.join(" ", authorizationRequest.getScopes());
 
     final GetRequest request =
-        Unirest.get(authorizationRequest.getLink())
+        unirestInstance
+            .get(authorizationRequest.getLink())
             .queryString(CLIENT_ID.getJoseName(), authorizationRequest.getClientId())
             .queryString(RESPONSE_TYPE.getJoseName(), "code")
             .queryString(REDIRECT_URI.getJoseName(), authorizationRequest.getRedirectUri())
@@ -142,7 +154,8 @@ public class AuthenticatorClient {
       final Consumer<HttpResponse<String>> afterAuthenticationCallback) {
 
     final MultipartBody request =
-        Unirest.post(authenticationRequest.getAuthenticationEndpointUrl())
+        unirestInstance
+            .post(authenticationRequest.getAuthenticationEndpointUrl())
             .field("signed_challenge", authenticationRequest.getSignedChallenge().getRawString())
             .contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
             .header(HttpHeaders.USER_AGENT, USER_AGENT);
@@ -212,7 +225,8 @@ public class AuthenticatorClient {
       final UnaryOperator<MultipartBody> beforeAuthenticationCallback,
       final Consumer<HttpResponse<String>> afterAuthenticationCallback) {
     final MultipartBody request =
-        Unirest.post(authenticationRequest.getAuthenticationEndpointUrl())
+        unirestInstance
+            .post(authenticationRequest.getAuthenticationEndpointUrl())
             .field("ssotoken", authenticationRequest.getSsoToken())
             .field("unsigned_challenge", authenticationRequest.getChallengeToken().getRawString())
             .contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -234,7 +248,8 @@ public class AuthenticatorClient {
       final UnaryOperator<MultipartBody> beforeAuthenticationMapper,
       final Consumer<HttpResponse<String>> afterAuthenticationCallback) {
     final MultipartBody request =
-        Unirest.post(authenticationRequest.getAuthenticationEndpointUrl())
+        unirestInstance
+            .post(authenticationRequest.getAuthenticationEndpointUrl())
             .field(
                 "encrypted_signed_authentication_data",
                 authenticationRequest.getEncryptedSignedAuthenticationData().getRawString())
@@ -270,7 +285,8 @@ public class AuthenticatorClient {
             tokenKeyBytes, tokenRequest.getCodeVerifier(), tokenRequest.getIdpEnc());
 
     final MultipartBody request =
-        Unirest.post(tokenRequest.getTokenUrl())
+        unirestInstance
+            .post(tokenRequest.getTokenUrl())
             .field("grant_type", "authorization_code")
             .field("client_id", tokenRequest.getClientId())
             .field("code", tokenRequest.getCode())
@@ -322,7 +338,8 @@ public class AuthenticatorClient {
   public DiscoveryDocumentResponse retrieveDiscoveryDocument(
       final String discoveryDocumentUrl, final Optional<String> fixedIdpHost) {
     final HttpResponse<String> discoveryDocumentResponse =
-        Unirest.get(patchIdpHost(discoveryDocumentUrl, fixedIdpHost))
+        unirestInstance
+            .get(patchIdpHost(discoveryDocumentUrl, fixedIdpHost))
             .header(HttpHeaders.USER_AGENT, USER_AGENT)
             .asString();
     final JsonWebToken discoveryDocument = new JsonWebToken(discoveryDocumentResponse.getBody());
@@ -346,17 +363,15 @@ public class AuthenticatorClient {
                 fixedIdpHost))
         .discSig(discoveryDocument.getClientCertificateFromHeader().orElseThrow(exceptionSupplier))
         .pairingEndpoint(
-            patchIdpHost(
-                discoveryDocument
-                    .getStringBodyClaim(URI_PAIR)
-                    .orElse("<IDP DOES NOT SUPPORT ALTERNATIVE AUTHENTICATION>"),
-                fixedIdpHost))
+            discoveryDocument
+                .getStringBodyClaim(URI_PAIR)
+                .map(uriPair -> patchIdpHost(uriPair, fixedIdpHost))
+                .orElse("<IDP DOES NOT SUPPORT ALTERNATIVE AUTHENTICATION>"))
         .authPairEndpoint(
-            patchIdpHost(
-                discoveryDocument
-                    .getStringBodyClaim(AUTH_PAIR_ENDPOINT)
-                    .orElse("<IDP DOES NOT SUPPORT ALTERNATIVE AUTHENTICATION>"),
-                fixedIdpHost))
+            discoveryDocument
+                .getStringBodyClaim(AUTH_PAIR_ENDPOINT)
+                .map(uriPair -> patchIdpHost(uriPair, fixedIdpHost))
+                .orElse("<IDP DOES NOT SUPPORT ALTERNATIVE AUTHENTICATION>"))
         .idpSig(
             retrieveServerCertFromLocation(
                 patchIdpHost(
@@ -413,18 +428,18 @@ public class AuthenticatorClient {
     }
   }
 
-  private X509Certificate retrieveServerCertFromLocation(final String uri) {
+  X509Certificate retrieveServerCertFromLocation(final String uri) {
     final HttpResponse<JsonNode> pukAuthResponse =
-        Unirest.get(uri).header(HttpHeaders.USER_AGENT, USER_AGENT).asJson();
+        unirestInstance.get(uri).header(HttpHeaders.USER_AGENT, USER_AGENT).asJson();
     final JSONObject keyObject = pukAuthResponse.getBody().getObject();
     final String verificationCertificate =
         keyObject.getJSONArray(X509_CERTIFICATE_CHAIN.getJoseName()).getString(0);
     return getCertificateFromPem(Base64.getDecoder().decode(verificationCertificate));
   }
 
-  private PublicKey retrieveServerPuKFromLocation(final String uri) {
+  PublicKey retrieveServerPuKFromLocation(final String uri) {
     final HttpResponse<JsonNode> pukAuthResponse =
-        Unirest.get(uri).header(HttpHeaders.USER_AGENT, USER_AGENT).asJson();
+        unirestInstance.get(uri).header(HttpHeaders.USER_AGENT, USER_AGENT).asJson();
     final JSONObject keyObject = pukAuthResponse.getBody().getObject();
     try {
       return getPublicKey(keyObject);

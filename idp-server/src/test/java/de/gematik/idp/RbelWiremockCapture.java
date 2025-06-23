@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 gematik GmbH
+ * Copyright (Date see Readme), gematik GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * *******
+ *
+ * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
 package de.gematik.idp;
@@ -74,7 +78,7 @@ public class RbelWiremockCapture extends RbelCapturer {
         (request, response) -> {
           getRbelConverter()
               .parseMessage(
-                  requestToRbelMessage(request),
+                  requestToRbelMessage(request, request.getHost()),
                   new RbelHostname(request.getClientIp(), -1),
                   new RbelHostname(request.getHost(), request.getPort()),
                   Optional.empty());
@@ -108,15 +112,23 @@ public class RbelWiremockCapture extends RbelCapturer {
     return wireMockConfiguration;
   }
 
-  private byte[] requestToRbelMessage(final Request request) {
+  private byte[] requestToRbelMessage(final Request request, final String host) {
+    final String body =
+        request.getHeaders().all().stream()
+            .map(HttpHeader::toString)
+            .collect(Collectors.joining("\r\n"));
     final byte[] httpRequestHeader =
         (request.getMethod().toString()
                 + " "
                 + getRequestUrl(request)
                 + " HTTP/1.1\r\n"
-                + request.getHeaders().all().stream()
-                    .map(HttpHeader::toString)
-                    .collect(Collectors.joining("\r\n"))
+                + "Host: "
+                + host
+                + "\r\n"
+                + "Content-Length: "
+                + (body.length() + 2)
+                + "\r\n"
+                + body
                 + "\r\n\r\n")
             .getBytes();
 
@@ -124,16 +136,21 @@ public class RbelWiremockCapture extends RbelCapturer {
   }
 
   private byte[] responseToRbelMessage(final Response response) {
+    final String body =
+        response.getHeaders().all().stream()
+            .map(HttpHeader::toString)
+            .map(str -> str.replace("\n", "\r\n"))
+            .collect(Collectors.joining("\r\n"));
     final byte[] httpResponseHeader =
         ("HTTP/1.1 "
                 + response.getStatus()
                 + " "
                 + (response.getStatusMessage() != null ? response.getStatusMessage() : "")
                 + "\r\n"
-                + response.getHeaders().all().stream()
-                    .map(HttpHeader::toString)
-                    .map(str -> str.replace("\n", "\r\n"))
-                    .collect(Collectors.joining("\r\n"))
+                + "Content-Length: "
+                + (body.length() + 2)
+                + "\r\n"
+                + body
                 + "\r\n\r\n")
             .getBytes();
 
