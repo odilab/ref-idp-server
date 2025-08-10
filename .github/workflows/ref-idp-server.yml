@@ -1,0 +1,46 @@
+name: Build idp-server Image
+on:
+  workflow_dispatch:
+env:
+  SOURCE_REPOSITORY: ${{ github.repository }}
+jobs:
+  mavenBuildIdp:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    outputs:
+      latest_tag: ${{ steps.tag.outputs.LATEST_TAG }}
+      latest_image: ${{ steps.image.outputs.LATEST_IMAGE }}
+    steps:
+      - name: Checkout repository tag
+        uses: actions/checkout@v4.2.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          fetch-tags: 'true'
+      - name: Set LATEST_TAG
+        id: tag
+        run: |
+          echo "LATEST_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+          echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.7.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build with Maven
+        run: |
+          mvn clean install -pl idp-server  -Dskip.dockerbuild=false -Dcommit_hash=`git log --pretty=format:'%H' -n 1`
+      - name: Push to GHCR
+        env:
+          LATEST_TAG: ${{ steps.tag.outputs.LATEST_TAG }}
+          SHA_SHORT: ${{ steps.tag.outputs.SHA_SHORT }}
+        id: image
+        run: |
+          docker tag local/idm/idp-server:${{ env.LATEST_TAG }} ghcr.io/${{ github.repository }}:${{ env.SHA_SHORT }}
+          docker tag local/idm/idp-server:${{ env.LATEST_TAG }} ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}
+          docker tag local/idm/idp-server:${{ env.LATEST_TAG }} ghcr.io/${{ github.repository }}:latest
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          docker push --all-tags ghcr.io/${{ github.repository }}

@@ -102,7 +102,7 @@ public class DiscoveryDocumentController {
     setNoCacheHeader(response);
     return signDiscoveryDocument(
         discoveryDocumentBuilder.buildDiscoveryDocument(
-            serverUrlService.determineServerUrlRuntime(),
+            serverUrlService.determineServerUrl(request),
             serverUrlService.getIssuerUrl(),
             scopes,
             fedAuthEndpoint));

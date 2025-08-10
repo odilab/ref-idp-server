@@ -24,6 +24,7 @@ import static de.gematik.idp.IdpConstants.DEFAULT_SERVER_URL;
 
 import de.gematik.idp.server.configuration.IdpConfiguration;
 import de.gematik.idp.server.services.ServerPortListener;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -38,10 +39,19 @@ public class ServerUrlService {
 
   private final IdpConfiguration idpConfiguration;
 
+  public String determineServerUrl(final HttpServletRequest request) {
+    return getServerUrlFromConfig()
+        .orElse(request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort());
+  }
+
+  public String determineServerUrl() {
+    return getServerUrlFromConfig().orElse(DEFAULT_SERVER_URL);
+  }
+
   public String determineServerUrlRuntime() {
     return getServerUrlFromConfig().orElse(getServerUrlLocalInstance());
   }
-
+  
   public String determineServerUrlConfigured() {
     return getServerUrlFromConfig().orElse(DEFAULT_SERVER_URL);
   }
