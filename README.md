@@ -17,7 +17,7 @@ The **IDP-Global** project consists of various sub-projects. These are
 
 #### Use existing image from docker hub
 
-https://hub.docker.com/repository/docker/gematik1/idp-server
+https://hub.docker.com/r/gematik1/idp-server
 
 #### Build image of Idp-Server, 2 examples
 
