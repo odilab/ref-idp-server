@@ -28,15 +28,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class ServerUrlService {
 
-  @Autowired private ServerPortListener serverPortListener;
-
+  private final ServerPortListener serverPortListener;
   private final IdpConfiguration idpConfiguration;
 
   public String determineServerUrl(final HttpServletRequest request) {
