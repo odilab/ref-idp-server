@@ -1,3 +1,12 @@
+# Release 30.0.11
+
+- update dependencies
+- docker health check without curl
+
+# Release 30.0.9
+
+- update dependencies
+
 # Release 30.0.5
 
 - fix CWE-601 Open Redirect Vulnerability, thanks to Machine Spirits UG
