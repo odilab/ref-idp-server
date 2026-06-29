@@ -1,12 +1,9 @@
-name: DEV Deploy ERP
+name: DEV Deploy IDP
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
-
-env:
-  DEPLOYMENT_KEY: ${{ secrets.DEPLOYMENT_KEY }}
 
 jobs:
   build:
@@ -17,14 +14,14 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     secrets: inherit
   deploy:
-    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) && vars.SERVER_IP != '' && env.DEPLOYMENT_KEY != '' }}
+    if: ${{ github.actor != 'dependabot[bot]'}}
     needs: [ build ]
     environment:
       name: dev
       url: https://dev-idp.optadata-innovationlab.de/swagger-ui/index.html
     permissions:
-      contents: read
-      packages: read
+      contents: write
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -39,7 +36,7 @@ jobs:
         with:
           hostvar: erp-service-dev
           server_ip: ${{ vars.SERVER_IP }}
-          ssh_key: ${{ env.DEPLOYMENT_KEY }}
+          ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
       - name: Deploy IDP-Server
         id: deploy-compose
         env:
