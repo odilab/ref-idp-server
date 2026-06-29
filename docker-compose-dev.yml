@@ -1,0 +1,63 @@
+# Common Environment Timezone Entry
+x-environment-timezone: &environment-timezone-ref
+  TZ: Europe/Berlin
+
+# Common Service Properties
+x-service-setup: &service-setup-ref
+  restart: always
+
+# Common Network
+x-service-network: &service-network-ref
+  networks:
+    idp-reference:
+
+services:
+  proxy:
+    profiles:
+      - dev
+    image: traefik:v3.7.5
+    <<: [*service-network-ref, *service-setup-ref]
+    command:
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.erp-service.acme.tlschallenge=true"
+      - "--certificatesresolvers.erp-service.acme.email=hostmaster@optadata-innovationlab.de"
+      - "--certificatesresolvers.erp-service.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /letsencrypt:/letsencrypt
+
+  # Idp-Server
+  idpserver:
+    image: ${IDP_SERVER_IMAGE:-ghcr.io/odilab/ref-idp-server:latest}
+    user: 10000:10000
+    container_name: idp-server
+    <<: [*service-network-ref, *service-setup-ref]
+    environment:
+      IDP_SERVER_URL: "${IDP_SERVER_URL:-http://localhost:8571}"
+      LOG_LEVEL_GEMATIK: ${LOG_LEVEL_GEMATIK:-debug}
+      REQUEST_LOGGING_ENABLED: ${REQUEST_LOGGING_ENABLED:-true}
+      MANAGEMENT_PORT: 8180 # Spring Actuator Port
+      <<: *environment-timezone-ref
+    ports:
+      - "8571:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=idp-reference"
+      - "traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`)"
+      - "traefik.http.routers.idp-server.entrypoints=websecure"
+      - "traefik.http.routers.idp-server.tls.certresolver=erp-service"
+      - "traefik.http.services.idp-server.loadbalancer.server.port=8080"
+
+networks:
+  idp-reference:
+    name: idp-reference
