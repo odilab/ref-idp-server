@@ -32,7 +32,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: odilab/odil-actions/.github/actions/ssh-connect@main
+      - uses: ./.github/actions/ssh-connect
         id: ssh-connect
         with:
           hostvar: erp-service-dev
