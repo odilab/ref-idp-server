@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,17 +38,17 @@ jobs:
           hostvar: erp-service-dev
           server_ip: ${{ vars.SERVER_IP }}
           ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
-      - name: Deploy IDP-Server
-        id: deploy-compose
-        env:
-          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
-          DOCKER_HOST: ssh://root@${{ vars.SERVER_IP }}
-          COMPOSE_FILE: docker-compose-dev.yml
-          COMPOSE_PROFILES: dev
-          IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
-          IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
-        run: |
-          docker pull ${{ env.IDP_SERVER_IMAGE }}
-          docker compose -f ${{ env.COMPOSE_FILE }} down
-          IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
+#      - name: Deploy IDP-Server
+#        id: deploy-compose
+#        env:
+#          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
+#          DOCKER_HOST: ssh://root@${{ vars.SERVER_IP }}
+#          COMPOSE_FILE: docker-compose-dev.yml
+#          COMPOSE_PROFILES: dev
+#          IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
+#          IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
+#        run: |
+#          docker pull ${{ env.IDP_SERVER_IMAGE }}
+#          docker compose -f ${{ env.COMPOSE_FILE }} down
+#          IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
+#          docker compose -f ${{ env.COMPOSE_FILE }} up -d
