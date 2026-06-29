@@ -1,0 +1,57 @@
+name: DEV Deploy ERP
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: dev-deploy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    secrets: inherit
+  deploy:
+    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) && vars.SERVER_IP != '' && secrets.DEPLOYMENT_KEY != '' }}
+    needs: [build]
+    environment:
+      name: dev
+      url: https://dev-idp.optadata-innovationlab.de/swagger-ui/index.html
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Login ghcr.io
+        uses: docker/login-action@v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: odilab/odil-actions/.github/actions/ssh-connect@main
+        id: ssh-connect
+        with:
+          hostvar: erp-service-dev
+          server_ip: ${{ vars.SERVER_IP }}
+          ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
+      - name: Deploy IDP-Server
+        id: deploy-compose
+        env:
+          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
+          DOCKER_HOST: ssh://root@${{ vars.SERVER_IP }}
+          COMPOSE_FILE: docker-compose-dev.yml
+          COMPOSE_PROFILES: dev
+          IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
+          IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
+        run: |
+          docker pull ${{ env.IDP_SERVER_IMAGE }}
+          docker compose -f ${{ env.COMPOSE_FILE }} down
+          IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d
