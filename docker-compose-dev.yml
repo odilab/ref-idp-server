@@ -54,6 +54,8 @@ services:
       <<: *environment-timezone-ref
     ports:
       - "8571:8080"
+    volumes:
+      - /credentials:/credentials:ro
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=idp-reference"
