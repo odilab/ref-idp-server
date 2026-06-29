@@ -36,23 +36,32 @@ jobs:
           cache: 'maven'
       - name: Build Image
         run: mvn clean package -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dskip.dockerbuild=false
+      - name: Resolve built image tag
+        id: built-image
+        run: |
+          SOURCE_IMAGE=$(docker images --filter "reference=local/idm/idp-server:*" --format '{{.Repository}}:{{.Tag}}' | head -n 1)
+          if [ -z "${SOURCE_IMAGE}" ]; then
+            echo "No local/idm/idp-server image found after Maven build"
+            exit 1
+          fi
+          echo "image=${SOURCE_IMAGE}" >> $GITHUB_OUTPUT
       - name: Tag commit
         id: commit-tag
         run: |
           COMMIT_TAG=$(git rev-parse --short HEAD)
           IMAGE_REPO="ghcr.io/${{ github.repository }}"
-          docker tag local/idm/idp-server:latest ${IMAGE_REPO}:${COMMIT_TAG}
+          docker tag ${{ steps.built-image.outputs.image }} ${IMAGE_REPO}:${COMMIT_TAG}
           echo "tag=${COMMIT_TAG}" >> $GITHUB_OUTPUT
           echo "image=${IMAGE_REPO}:${COMMIT_TAG}" >> $GITHUB_OUTPUT
       - name: Tag image with PR number
         if: github.event_name == 'pull_request'
-        run: docker tag local/idm/idp-server:latest ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}
       - name: Tag image as test for workflow_dispatch
         if: github.event_name == 'workflow_dispatch'
-        run: docker tag local/idm/idp-server:latest ghcr.io/${{ github.repository }}:test
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:test
       - name: Tag version release
         if: startsWith(github.ref, 'refs/tags/v')
-        run: docker tag local/idm/idp-server:latest ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
       - name: Push tag to ghcr.io
         if: ${{ github.actor != 'dependabot[bot]' }}
         run: docker push --all-tags ghcr.io/${{ github.repository }}
