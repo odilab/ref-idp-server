@@ -55,7 +55,7 @@ services:
     ports:
       - "8571:8080"
     volumes:
-      - /credentials:/credentials:ro
+      - ${CREDENTIALS_SOURCE:-./credentials}:/credentials:ro
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=idp-reference"

@@ -49,6 +49,7 @@ jobs:
           IDP_IDPSIG_FILENAME: file:/credentials/idp_sig.p12
           IDP_IDPENC_FILENAME: file:/credentials/idp_enc.p12
           IDP_DISCSIGG_FILENAME: file:/credentials/disc_sig.p12
+          CREDENTIALS_SOURCE: /credentials
           IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
         run: |
           docker pull ${{ env.IDP_SERVER_IMAGE }}
