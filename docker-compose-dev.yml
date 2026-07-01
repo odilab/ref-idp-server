@@ -49,7 +49,7 @@ services:
       # /credentials dir (the re-signed p12s live in the oscp_credentials repo).
       IDP_IDPSIG_FILENAME: "${IDP_IDPSIG_FILENAME:-file:/credentials/idp_sig.p12}"
       IDP_IDPENC_FILENAME: "${IDP_IDPENC_FILENAME:-file:/credentials/idp_enc.p12}"
-      IDP_DISCSIGG_FILENAME: "${IDP_DISCSIGG_FILENAME:-file:/credentials/disc_sig.p12}"
+      IDP_DISCSIG_FILENAME: "${IDP_DISCSIG_FILENAME:-file:/credentials/disc_sig.p12}"
       LOG_LEVEL_GEMATIK: ${LOG_LEVEL_GEMATIK:-debug}
       REQUEST_LOGGING_ENABLED: ${REQUEST_LOGGING_ENABLED:-true}
       IDP_REGISTEREDCLIENT_EREZEPTAPP_REDIRECTURI: "https://redirect.gematik.de/erezept"
