@@ -32,17 +32,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ./.github/actions/ssh-connect
+      - uses: odilab/odil-actions/.github/actions/ssh-connect@main
         id: ssh-connect
         with:
-          hostvar: erp-service-dev
+          hostvar: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USER }}
+          port: ${{ vars.SSH_PORT }}
           server_ip: ${{ vars.SERVER_IP }}
           ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
       - name: Deploy IDP-Server
         id: deploy-compose
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
-          DOCKER_HOST: ssh://root@${{ vars.SERVER_IP }}
+          DOCKER_HOST: ssh://${{ vars.SSH_HOST }}
           COMPOSE_FILE: docker-compose-dev.yml
           COMPOSE_PROFILES: dev
           IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
