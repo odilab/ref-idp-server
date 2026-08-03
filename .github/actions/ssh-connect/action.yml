@@ -9,6 +9,10 @@ inputs:
     required: false
     description: "The SSH Username"
     default: "root"
+  port:
+    required: false
+    description: "The SSH Port"
+    default: "22"
   server_ip:
     required: true
     description: "The SSH Server IP"
@@ -45,14 +49,16 @@ runs:
       shell: bash
       env:
         SSH_USER: ${{ inputs.username }}
+        SSH_PORT: ${{ inputs.port }}
         SERVER_IP: ${{ inputs.server_ip }}
         HOSTVAR: ${{ inputs.hostvar }}
         PRIVATE_KEY_PATH: ~/.ssh/id_deploy
       run: |
-        ssh-keyscan ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+        ssh-keyscan -p ${{ env.SSH_PORT }} ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
         echo "Host ${{ env.HOSTVAR }}" > ~/.ssh/config
         echo "  HostName ${{ env.SERVER_IP }}" >> ~/.ssh/config
         echo "  User ${{ env.SSH_USER }}" >> ~/.ssh/config
+        echo "  Port ${{ env.SSH_PORT }}" >> ~/.ssh/config
         echo "  IdentityFile ${{ env.PRIVATE_KEY_PATH }}" >> ~/.ssh/config
     - name: Eval Agent
       if: ${{ inputs.ssh_key }}

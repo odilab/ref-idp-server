@@ -64,11 +64,13 @@ services:
       - "traefik.docker.network=idp-reference"
       - "traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`)"
       - "traefik.http.routers.idp-server.entrypoints=websecure"
-      - "traefik.http.rcccccdeejifckjegcgigknvkebjhgefgugggkjjcifjn
-      outers.idp-server.tls.certresolver=erp-service"
+      - "traefik.http.routers.idp-server.tls.certresolver=erp-service"
       - "traefik.http.services.idp-server.loadbalancer.server.port=8080"
 
 volumes:
-  credentials:
+  erp-credentials:
     external: true
-    name: erp-credentials
+
+networks:
+  idp-reference:
+    name: idp-reference

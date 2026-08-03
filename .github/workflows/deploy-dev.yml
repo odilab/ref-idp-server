@@ -32,7 +32,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: odilab/odil-actions/.github/actions/ssh-connect@main
+      - uses: ./.github/actions/ssh-connect
         id: ssh-connect
         with:
           hostvar: ${{ vars.SSH_HOST }}
@@ -58,3 +58,10 @@ jobs:
           docker compose -f ${{ env.COMPOSE_FILE }} down
           IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
           docker compose -f ${{ env.COMPOSE_FILE }} up -d
+      - name: Verify uid 10000 can read credentials
+        env:
+          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
+          DOCKER_HOST: ssh://${{ vars.SSH_HOST }}
+        run: |
+          docker run --rm -u 10000:10000 -v erp-credentials:/credentials:ro alpine:3.20 \
+            sh -c 'id -u && cat /credentials/idp_sig.p12 /credentials/idp_enc.p12 /credentials/disc_sig.p12 > /dev/null && echo credentials readable' 
