@@ -24,6 +24,10 @@ jobs:
       packages: write
       id-token: write
     runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST || 'erp-service-dev' }}
+      SSH_USER: ${{ vars.SSH_USER || 'odilab' }}
+      SSH_PORT: ${{ vars.SSH_PORT || '2222' }}
     steps:
       - uses: actions/checkout@v6
       - name: Login ghcr.io
@@ -35,16 +39,16 @@ jobs:
       - uses: ./.github/actions/ssh-connect
         id: ssh-connect
         with:
-          hostvar: ${{ vars.SSH_HOST }}
-          username: ${{ vars.SSH_USER }}
-          port: ${{ vars.SSH_PORT }}
+          hostvar: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          port: ${{ env.SSH_PORT }}
           server_ip: ${{ vars.SERVER_IP }}
           ssh_key: ${{ secrets.DEPLOYMENT_KEY }}
       - name: Deploy IDP-Server
         id: deploy-compose
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
-          DOCKER_HOST: ssh://${{ vars.SSH_HOST }}
+          DOCKER_HOST: ssh://${{ env.SSH_HOST }}
           COMPOSE_FILE: docker-compose-dev.yml
           COMPOSE_PROFILES: dev
           IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
@@ -61,7 +65,7 @@ jobs:
       - name: Verify uid 10000 can read credentials
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
-          DOCKER_HOST: ssh://${{ vars.SSH_HOST }}
+          DOCKER_HOST: ssh://${{ env.SSH_HOST }}
         run: |
           docker run --rm -u 10000:10000 -v erp-credentials:/credentials:ro alpine:3.20 \
-            sh -c 'id -u && cat /credentials/idp_sig.p12 /credentials/idp_enc.p12 /credentials/disc_sig.p12 > /dev/null && echo credentials readable' 
+            sh -c 'id -u && cat /credentials/idp_sig.p12 /credentials/idp_enc.p12 /credentials/disc_sig.p12 > /dev/null && echo credentials readable'
