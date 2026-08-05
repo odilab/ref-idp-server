@@ -62,7 +62,21 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=idp-reference"
-      - "traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`)"
+      # Path allowlist: only real idp-server endpoints are routed; every other
+      # path is answered by Traefik itself with a plain 404 and never reaches
+      # Spring (keeps internet scanner noise out of the idp logs). Extend the
+      # rule when the server gains new endpoints. Deliberately NOT routed:
+      # /h2-console (H2 web console; must not be publicly reachable) and the
+      # actuator (separate management port 8180, not exposed here anyway).
+      - >-
+        traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`) &&
+        (Path(`/.well-known/openid-configuration`) || Path(`/discoveryDocument`) ||
+        Path(`/auth/realms/idp/.well-known/openid-configuration`) || Path(`/jwks`) ||
+        Path(`/idpSig/jwk.json`) || Path(`/idpEnc/jwk.json`) ||
+        Path(`/sign_response`) || Path(`/alt_response`) || Path(`/sso_response`) ||
+        Path(`/token`) || Path(`/fed_idp_list`) ||
+        Path(`/pairings`) || PathPrefix(`/pairings/`) ||
+        Path(`/swagger-ui.html`) || PathPrefix(`/swagger-ui/`) || PathPrefix(`/v3/api-docs`))
       - "traefik.http.routers.idp-server.entrypoints=websecure"
       - "traefik.http.routers.idp-server.tls.certresolver=erp-service"
       - "traefik.http.services.idp-server.loadbalancer.server.port=8080"
