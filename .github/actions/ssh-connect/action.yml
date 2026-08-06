@@ -1,17 +1,20 @@
 name: Init SSH Connection
-description: Setup SSH Connection to a Server using a provided SSH Key
+description: >-
+  Install a base64 deploy key, pin the host key via ssh-keyscan, write an
+  ~/.ssh/config alias and start an ssh-agent. Outputs the agent socket so
+  later steps can use DOCKER_HOST=ssh://<hostvar>.
 author: odilab
 inputs:
   hostvar:
     required: true
-    description: "The name of the Host"
+    description: "ssh_config Host alias to define (use it as DOCKER_HOST=ssh://<alias>); not resolved via DNS"
   username:
     required: false
-    description: "The SSH Username"
+    description: "The SSH Username (odilab on the erp-service-dev fleet; the root default suits no odilab host)"
     default: "root"
   port:
     required: false
-    description: "The SSH Port"
+    description: "The SSH Port (2222 on the erp-service-dev fleet; the 22 default suits no odilab host)"
     default: "22"
   server_ip:
     required: true
@@ -29,7 +32,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository tag
+    - name: Checkout repository
       uses: actions/checkout@v6
     - name: Init deploy key
       id: ssh_keys
