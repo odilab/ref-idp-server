@@ -1,18 +1,18 @@
-# Common Environment Timezone Entry
 x-environment-timezone: &environment-timezone-ref
   TZ: Europe/Berlin
 
-# Common Service Properties
 x-service-setup: &service-setup-ref
   restart: always
 
-# Common Network
 x-service-network: &service-network-ref
   networks:
     idp-reference:
 
 services:
   proxy:
+    # Behind the `dev` profile: only the shared-server deploy starts this
+    # Traefik. The idp itself publishes no host port here — use
+    # docker-compose-ref.yml for local runs, which maps 8571:8080.
     profiles:
       - dev
     image: traefik:v3.7.5
@@ -36,27 +36,40 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /letsencrypt:/letsencrypt
 
-  # Idp-Server
   idpserver:
     image: ${IDP_SERVER_IMAGE:-ghcr.io/odilab/ref-idp-server:latest}
     user: 10000:10000
     container_name: idp-server
     <<: [*service-network-ref, *service-setup-ref]
     environment:
+      # Default is the OrbStack hostname for local macOS runs; the deploy
+      # workflow overrides this with the public https://dev-idp host, and the
+      # value is echoed verbatim into the discovery document.
       IDP_SERVER_URL: "${IDP_SERVER_URL:-https://idp-server.ref-idp-server.orb.local}"
       SERVER_FORWARDHEADERSSTRATEGY: "NATIVE"
       # Signing certs re-issued under our KOMP-CA99; loaded from the shared
-      # /credentials dir (the re-signed p12s live in the oscp_credentials repo).
+      # `erp-credentials` volume, seeded by the odilab/erp-credentials stack
+      # (supersedes the retired oscp_credentials repo).
       IDP_IDPSIG_FILENAME: "${IDP_IDPSIG_FILENAME:-file:/credentials/idp_sig.p12}"
       IDP_IDPENC_FILENAME: "${IDP_IDPENC_FILENAME:-file:/credentials/idp_enc.p12}"
       IDP_DISCSIG_FILENAME: "${IDP_DISCSIG_FILENAME:-file:/credentials/disc_sig.p12}"
       LOG_LEVEL_GEMATIK: ${LOG_LEVEL_GEMATIK:-debug}
       REQUEST_LOGGING_ENABLED: ${REQUEST_LOGGING_ENABLED:-true}
+      # https (not the application.yml http default): the E-Rezept-App only
+      # accepts an https redirect_uri, and the value must match the one the
+      # app sends or /sign_response rejects with code 1020.
       IDP_REGISTEREDCLIENT_EREZEPTAPP_REDIRECTURI: "https://redirect.gematik.de/erezept"
       MANAGEMENT_PORT: 8180 # Spring Actuator Port
+      # Defence in depth. No host port is published any more, but the H2 console
+      # would still answer any container on idp-reference. application.yml
+      # enables it together with settings.web-allow-others, and the console
+      # accepts an operator-supplied JDBC URL.
+      SPRING_H2_CONSOLE_ENABLED: "false"
       <<: *environment-timezone-ref
-    ports:
-      - "8571:8080"
+    # CREDENTIALS_SOURCE is either the shared named volume (deploy sets
+    # `erp-credentials`, declared external below) or a local bind path for
+    # standalone runs. A relative path is resolved by the compose CLIENT, so
+    # it is only usable when DOCKER_HOST is local.
     volumes:
       - ${CREDENTIALS_SOURCE:-../credentials}:/credentials:ro
     labels:
@@ -67,7 +80,8 @@ services:
       # Spring (keeps internet scanner noise out of the idp logs). Extend the
       # rule when the server gains new endpoints. Deliberately NOT routed:
       # /h2-console (H2 web console; must not be publicly reachable) and the
-      # actuator (separate management port 8180, not exposed here anyway).
+      # actuator (separate management port 8180, not published). idpserver
+      # publishes no host port, so this allowlist is the only ingress.
       - >-
         traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`) &&
         (Path(`/.well-known/openid-configuration`) || Path(`/discoveryDocument`) ||

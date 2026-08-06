@@ -55,13 +55,23 @@ jobs:
           IDP_IDPSIG_FILENAME: file:/credentials/idp_sig.p12
           IDP_IDPENC_FILENAME: file:/credentials/idp_enc.p12
           IDP_DISCSIG_FILENAME: file:/credentials/disc_sig.p12
+          # Named external volume (NOT a path): seeded by the
+          # odilab/erp-credentials stack, mounted read-only at /credentials.
           CREDENTIALS_SOURCE: erp-credentials
           IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
         run: |
+          # No `down`: it would run with COMPOSE_PROFILES=dev and stop the SHARED
+          # Traefik, and it would try to remove the idp-reference network that the
+          # erp-services and erp-fd stacks reference as external. `up -d`
+          # recreates idp-server on its own, because the image tag changed.
+          # --remove-orphans prunes only services absent from this file, so the
+          # shared proxy survives — until someone removes or renames it here.
           docker pull ${{ env.IDP_SERVER_IMAGE }}
-          docker compose -f ${{ env.COMPOSE_FILE }} down
           IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans
+      # The upstream Dockerfile runs the server as uid 10000, so the p12s in
+      # the shared volume must be world-readable. Re-seeding erp-credentials
+      # has broken this before; fail the deploy here rather than on p12 load.
       - name: Verify uid 10000 can read credentials
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
