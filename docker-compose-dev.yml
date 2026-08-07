@@ -6,35 +6,9 @@ x-service-setup: &service-setup-ref
 
 x-service-network: &service-network-ref
   networks:
-    idp-reference:
+    proxy:
 
 services:
-  proxy:
-    # Profil dev: nur das Server-Deploy startet diesen Traefik.
-    # Lokal docker-compose-ref.yml nutzen (mappt 8571:8080).
-    profiles:
-      - dev
-    image: traefik:v3.7.5
-    <<: [*service-network-ref, *service-setup-ref]
-    command:
-      - "--log.level=INFO"
-      - "--accesslog=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--certificatesresolvers.erp-service.acme.tlschallenge=true"
-      - "--certificatesresolvers.erp-service.acme.email=hostmaster@optadata-innovationlab.de"
-      - "--certificatesresolvers.erp-service.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /letsencrypt:/letsencrypt
-
   idpserver:
     image: ${IDP_SERVER_IMAGE:-ghcr.io/odilab/ref-idp-server:latest}
     user: 10000:10000
@@ -66,7 +40,7 @@ services:
       - ${CREDENTIALS_SOURCE:-../credentials}:/credentials:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=idp-reference"
+      - "traefik.docker.network=proxy"
       # Pfad-Allowlist: alles andere beantwortet Traefik mit 404, Spring sieht
       # es nie. Bei neuen Endpunkten erweitern. Bewusst nicht geroutet:
       # /h2-console und Actuator (Port 8180). Kein Host-Port — einziger Ingress.
@@ -88,5 +62,6 @@ volumes:
     external: true
 
 networks:
-  idp-reference:
-    name: idp-reference
+  proxy:
+    external: true
+    name: proxy
