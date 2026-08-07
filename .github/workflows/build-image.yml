@@ -1,0 +1,80 @@
+name: Build idp-server Image
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_call:
+    outputs:
+      commit_tag:
+        description: "Short commit SHA tag for the image"
+        value: ${{ jobs.bootBuildImage.outputs.commit_tag }}
+      image:
+        description: "Full image reference for this commit"
+        value: ${{ jobs.bootBuildImage.outputs.image }}
+
+jobs:
+  bootBuildImage:
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    # Serialisiert Läufe je Ref; auf main gewinnt der neueste Merge,
+    # damit :latest nie auf einen älteren Stand zurückfällt.
+    concurrency:
+      group: build-image-${{ github.ref }}
+      cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    outputs:
+      commit_tag: ${{ steps.commit-tag.outputs.tag }}
+      image: ${{ steps.commit-tag.outputs.image }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Login ghcr.io
+        uses: docker/login-action@v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up JDK
+        uses: actions/setup-java@v5.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build Image
+        run: mvn clean package -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dskip.dockerbuild=false
+      - name: Resolve built image tag
+        id: built-image
+        run: |
+          SOURCE_IMAGE=$(docker images --filter "reference=local/idm/idp-server:*" --format '{{.Repository}}:{{.Tag}}' | head -n 1)
+          if [ -z "${SOURCE_IMAGE}" ]; then
+            echo "No local/idm/idp-server image found after Maven build"
+            exit 1
+          fi
+          echo "image=${SOURCE_IMAGE}" >> $GITHUB_OUTPUT
+      - name: Tag commit
+        id: commit-tag
+        run: |
+          COMMIT_TAG=$(git rev-parse --short HEAD)
+          IMAGE_REPO="ghcr.io/${{ github.repository }}"
+          docker tag ${{ steps.built-image.outputs.image }} ${IMAGE_REPO}:${COMMIT_TAG}
+          echo "tag=${COMMIT_TAG}" >> $GITHUB_OUTPUT
+          echo "image=${IMAGE_REPO}:${COMMIT_TAG}" >> $GITHUB_OUTPUT
+      - name: Tag image with PR number
+        if: github.event_name == 'pull_request'
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}
+      - name: Tag image as test for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:test
+      - name: Tag version release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
+      # main ist protected — ein Push dorthin ist immer ein PR-Merge.
+      - name: Tag image as latest on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:latest
+      - name: Push tag to ghcr.io
+        run: docker push --all-tags ghcr.io/${{ github.repository }}

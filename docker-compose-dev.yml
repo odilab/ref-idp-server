@@ -1,0 +1,92 @@
+x-environment-timezone: &environment-timezone-ref
+  TZ: Europe/Berlin
+
+x-service-setup: &service-setup-ref
+  restart: always
+
+x-service-network: &service-network-ref
+  networks:
+    idp-reference:
+
+services:
+  proxy:
+    # Profil dev: nur das Server-Deploy startet diesen Traefik.
+    # Lokal docker-compose-ref.yml nutzen (mappt 8571:8080).
+    profiles:
+      - dev
+    image: traefik:v3.7.5
+    <<: [*service-network-ref, *service-setup-ref]
+    command:
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.erp-service.acme.tlschallenge=true"
+      - "--certificatesresolvers.erp-service.acme.email=hostmaster@optadata-innovationlab.de"
+      - "--certificatesresolvers.erp-service.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /letsencrypt:/letsencrypt
+
+  idpserver:
+    image: ${IDP_SERVER_IMAGE:-ghcr.io/odilab/ref-idp-server:latest}
+    user: 10000:10000
+    container_name: idp-server
+    <<: [*service-network-ref, *service-setup-ref]
+    environment:
+      # Default: OrbStack-Hostname für lokale Läufe; das Deploy setzt die
+      # öffentliche URL. Der Wert landet 1:1 im Discovery-Dokument.
+      IDP_SERVER_URL: "${IDP_SERVER_URL:-https://idp-server.ref-idp-server.orb.local}"
+      SERVER_FORWARDHEADERSSTRATEGY: "NATIVE"
+      # Unter unserer KOMP-CA99 ausgestellt; aus dem geteilten Volume
+      # erp-credentials (Stack odilab/erp-credentials).
+      IDP_IDPSIG_FILENAME: "${IDP_IDPSIG_FILENAME:-file:/credentials/idp_sig.p12}"
+      IDP_IDPENC_FILENAME: "${IDP_IDPENC_FILENAME:-file:/credentials/idp_enc.p12}"
+      IDP_DISCSIG_FILENAME: "${IDP_DISCSIG_FILENAME:-file:/credentials/disc_sig.p12}"
+      LOG_LEVEL_GEMATIK: ${LOG_LEVEL_GEMATIK:-debug}
+      REQUEST_LOGGING_ENABLED: ${REQUEST_LOGGING_ENABLED:-true}
+      # https statt des http-Defaults der application.yml; muss exakt dem
+      # redirect_uri der App entsprechen, sonst 1020 an /sign_response.
+      IDP_REGISTEREDCLIENT_EREZEPTAPP_REDIRECTURI: "https://redirect.gematik.de/erezept"
+      MANAGEMENT_PORT: 8180 # Spring Actuator Port
+      # Defense-in-depth: application.yml aktiviert die H2-Console samt
+      # web-allow-others — sie antwortete sonst jedem Container im Netz.
+      SPRING_H2_CONSOLE_ENABLED: "false"
+      <<: *environment-timezone-ref
+    # Deploy: benanntes externes Volume erp-credentials. Lokal: Bind-Pfad —
+    # relative Pfade löst der Compose-Client auf, nicht der remote Docker-Host.
+    volumes:
+      - ${CREDENTIALS_SOURCE:-../credentials}:/credentials:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=idp-reference"
+      # Pfad-Allowlist: alles andere beantwortet Traefik mit 404, Spring sieht
+      # es nie. Bei neuen Endpunkten erweitern. Bewusst nicht geroutet:
+      # /h2-console und Actuator (Port 8180). Kein Host-Port — einziger Ingress.
+      - >-
+        traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`) &&
+        (Path(`/.well-known/openid-configuration`) || Path(`/discoveryDocument`) ||
+        Path(`/auth/realms/idp/.well-known/openid-configuration`) || Path(`/jwks`) ||
+        Path(`/idpSig/jwk.json`) || Path(`/idpEnc/jwk.json`) ||
+        Path(`/sign_response`) || Path(`/alt_response`) || Path(`/sso_response`) ||
+        Path(`/token`) || Path(`/fed_idp_list`) ||
+        Path(`/pairings`) || PathPrefix(`/pairings/`) ||
+        Path(`/swagger-ui.html`) || PathPrefix(`/swagger-ui/`) || PathPrefix(`/v3/api-docs`))
+      - "traefik.http.routers.idp-server.entrypoints=websecure"
+      - "traefik.http.routers.idp-server.tls.certresolver=erp-service"
+      - "traefik.http.services.idp-server.loadbalancer.server.port=8080"
+
+volumes:
+  erp-credentials:
+    external: true
+
+networks:
+  idp-reference:
+    name: idp-reference
