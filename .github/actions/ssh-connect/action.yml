@@ -34,18 +34,22 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v6
+    # Inputs reach the shell only via env; nothing is ${{ }}-interpolated into
+    # script text, so a crafted or multi-line value cannot become shell code.
+    # The key path is set in-script from $HOME because a quoted "$VAR" does
+    # not tilde-expand.
     - name: Init deploy key
       id: ssh_keys
       if: ${{ inputs.ssh_key }}
       env:
         PRIVATE_KEY: ${{ inputs.ssh_key }}
-        PRIVATE_KEY_PATH: ~/.ssh/id_deploy
       shell: bash
       run: |
+        PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
-        echo ${{ env.PRIVATE_KEY }}| base64 -d > ${{ env.PRIVATE_KEY_PATH }} && chmod 600 ${{ env.PRIVATE_KEY_PATH }}
-        ssh-keygen -f ${{ env.PRIVATE_KEY_PATH }} -y > ${{ env.PRIVATE_KEY_PATH }}.pub && chmod 644 ${{ env.PRIVATE_KEY_PATH }}.pub
+        printf '%s' "$PRIVATE_KEY" | base64 -d > "$PRIVATE_KEY_PATH" && chmod 600 "$PRIVATE_KEY_PATH"
+        ssh-keygen -f "$PRIVATE_KEY_PATH" -y > "$PRIVATE_KEY_PATH.pub" && chmod 644 "$PRIVATE_KEY_PATH.pub"
     - name: Write SSH config
       id: write-ssh-config
       if: ${{ inputs.ssh_key }}
@@ -55,14 +59,14 @@ runs:
         SSH_PORT: ${{ inputs.port }}
         SERVER_IP: ${{ inputs.server_ip }}
         HOSTVAR: ${{ inputs.hostvar }}
-        PRIVATE_KEY_PATH: ~/.ssh/id_deploy
       run: |
-        ssh-keyscan -p ${{ env.SSH_PORT }} ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
-        echo "Host ${{ env.HOSTVAR }}" > ~/.ssh/config
-        echo "  HostName ${{ env.SERVER_IP }}" >> ~/.ssh/config
-        echo "  User ${{ env.SSH_USER }}" >> ~/.ssh/config
-        echo "  Port ${{ env.SSH_PORT }}" >> ~/.ssh/config
-        echo "  IdentityFile ${{ env.PRIVATE_KEY_PATH }}" >> ~/.ssh/config
+        PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
+        ssh-keyscan -p "$SSH_PORT" "$SERVER_IP" >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+        echo "Host $HOSTVAR" > ~/.ssh/config
+        echo "  HostName $SERVER_IP" >> ~/.ssh/config
+        echo "  User $SSH_USER" >> ~/.ssh/config
+        echo "  Port $SSH_PORT" >> ~/.ssh/config
+        echo "  IdentityFile $PRIVATE_KEY_PATH" >> ~/.ssh/config
     - name: Eval Agent
       if: ${{ inputs.ssh_key }}
       id: ssh-agent
@@ -70,10 +74,10 @@ runs:
       env:
         SSH_USER: ${{ inputs.username }}
         HOSTVAR: ${{ inputs.hostvar }}
-        PRIVATE_KEY_PATH: ~/.ssh/id_deploy
       run: |
+        PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
         eval "$(ssh-agent -s)"
         export SSH_AUTH_SOCK
-        ssh-add ${{ env.PRIVATE_KEY_PATH }}
-        echo "ssh_auth_sock=$SSH_AUTH_SOCK" >> $GITHUB_OUTPUT
-        echo "ssh_url=ssh://${{ env.SSH_USER }}@${{ env.HOSTVAR }}" >> $GITHUB_OUTPUT
+        ssh-add "$PRIVATE_KEY_PATH"
+        echo "ssh_auth_sock=$SSH_AUTH_SOCK" >> "$GITHUB_OUTPUT"
+        echo "ssh_url=ssh://$SSH_USER@$HOSTVAR" >> "$GITHUB_OUTPUT"

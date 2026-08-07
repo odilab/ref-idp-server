@@ -9,20 +9,25 @@ jobs:
   build:
     if: ${{ github.actor != 'dependabot[bot]' }}
     permissions:
-      contents: write
+      contents: read
       packages: write
+    # No `secrets: inherit`: the build only needs the automatic GITHUB_TOKEN,
+    # which is always passed to called workflows. DEPLOYMENT_KEY stays here.
     uses: ./.github/workflows/build-image.yml
-    secrets: inherit
   deploy:
     if: ${{ github.actor != 'dependabot[bot]'}}
     needs: [ build ]
+    # Serialize deploys: two quick pushes must not race `docker compose up`
+    # against the same DOCKER_HOST.
+    concurrency:
+      group: dev-deploy
+      cancel-in-progress: false
     environment:
       name: dev
       url: https://dev-idp.optadata-innovationlab.de/swagger-ui/index.html
     permissions:
-      contents: write
-      packages: write
-      id-token: write
+      contents: read
+      packages: read
     runs-on: ubuntu-latest
     env:
       SSH_HOST: ${{ vars.SSH_HOST || 'erp-service-dev' }}
