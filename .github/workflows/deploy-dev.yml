@@ -7,20 +7,17 @@ on:
 
 jobs:
   build:
-    # Same-repo PRs only: a fork PR gets no secrets and a read-only
-    # GITHUB_TOKEN, so both jobs could only fail. Skip them cleanly.
+    # Fork-PRs: keine Secrets, GITHUB_TOKEN read-only — sauber skippen.
     if: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     permissions:
       contents: read
       packages: write
-    # No `secrets: inherit`: the build only needs the automatic GITHUB_TOKEN,
-    # which is always passed to called workflows. DEPLOYMENT_KEY stays here.
+    # Kein secrets:inherit — der Build braucht nur den automatischen GITHUB_TOKEN.
     uses: ./.github/workflows/build-image.yml
   deploy:
     if: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     needs: [ build ]
-    # Serialize deploys: two quick pushes must not race `docker compose up`
-    # against the same DOCKER_HOST.
+    # Serialisiert Deploys gegen denselben Host.
     concurrency:
       group: dev-deploy
       cancel-in-progress: false
@@ -32,8 +29,8 @@ jobs:
       packages: read
     runs-on: ubuntu-latest
     env:
-      # No fallbacks, per landscape convention: an unset repo variable must
-      # fail visibly (the ssh-connect validate step names the missing one).
+      # Keine Fallbacks — ungesetzte Repo-Variablen schlagen im
+      # Validate-Step von ssh-connect benannt fehl.
       SSH_HOST: ${{ vars.SSH_HOST }}
       SSH_USER: ${{ vars.SSH_USER }}
       SSH_PORT: ${{ vars.SSH_PORT }}
@@ -64,22 +61,18 @@ jobs:
           IDP_IDPSIG_FILENAME: file:/credentials/idp_sig.p12
           IDP_IDPENC_FILENAME: file:/credentials/idp_enc.p12
           IDP_DISCSIG_FILENAME: file:/credentials/disc_sig.p12
-          # Named external volume (NOT a path): seeded by the
-          # odilab/erp-credentials stack, mounted read-only at /credentials.
+          # Benanntes externes Volume (kein Pfad), geseedet vom Stack odilab/erp-credentials.
           CREDENTIALS_SOURCE: erp-credentials
           IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
         run: |
-          # No `down`: it would run with COMPOSE_PROFILES=dev and stop the SHARED
-          # Traefik, and it would try to remove the idp-reference network that the
-          # erp-services and erp-fd stacks reference as external. `up -d`
-          # recreates idp-server on its own, because the image tag changed.
-          # --remove-orphans prunes only services absent from this file, so the
-          # shared proxy survives — until someone removes or renames it here.
+          # Kein `down`: mit COMPOSE_PROFILES=dev stoppte es den geteilten Traefik
+          # und griffe das extern referenzierte Netz idp-reference an. `up -d`
+          # legt den idp-server wegen des neuen Image-Tags ohnehin neu an;
+          # --remove-orphans räumt nur Services ab, die nicht mehr hier stehen.
           docker pull ${{ env.IDP_SERVER_IMAGE }}
           docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans
-      # The upstream Dockerfile runs the server as uid 10000, so the p12s in
-      # the shared volume must be world-readable. Re-seeding erp-credentials
-      # has broken this before; fail the deploy here rather than on p12 load.
+      # Upstream-Image läuft als uid 10000; die p12s müssen dafür lesbar sein.
+      # Beim Re-Seeden schon einmal gebrochen — lieber hier scheitern als beim p12-Load.
       - name: Verify uid 10000 can read credentials
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}

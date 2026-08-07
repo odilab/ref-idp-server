@@ -10,10 +10,10 @@ inputs:
     description: "ssh_config Host alias to define (use it as DOCKER_HOST=ssh://<alias>); not resolved via DNS"
   username:
     required: true
-    description: "The SSH Username (odilab on the erp-service-dev fleet); no default, an empty value fails validation"
+    description: "The SSH Username (odilab on the erp-service-dev fleet)"
   port:
     required: true
-    description: "The SSH Port (2222 on the erp-service-dev fleet); no default, an empty value fails validation"
+    description: "The SSH Port (2222 on the erp-service-dev fleet)"
   server_ip:
     required: true
     description: "The SSH Server IP"
@@ -32,9 +32,8 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v6
-    # Composite actions do not enforce `required: true`, and an unset secret
-    # or repo variable expands to "". Fail here with a named cause instead of
-    # skipping silently and letting a later docker/ssh step fail opaquely.
+    # Composite-Actions erzwingen `required: true` nicht; ungesetzte
+    # Secrets/Variablen kommen als "" an. Hier benannt fehlschlagen.
     - name: Validate inputs
       shell: bash
       env:
@@ -51,10 +50,8 @@ runs:
         [ -n "$SERVER_IP" ] || { echo "::error::ssh-connect: input 'server_ip' is empty - is the SERVER_IP repo variable set?"; fail=1; }
         [ -n "$SSH_KEY" ] || { echo "::error::ssh-connect: input 'ssh_key' is empty - is the DEPLOYMENT_KEY secret set?"; fail=1; }
         exit "$fail"
-    # Inputs reach the shell only via env; nothing is ${{ }}-interpolated into
-    # script text, so a crafted or multi-line value cannot become shell code.
-    # The key path is set in-script from $HOME because a quoted "$VAR" does
-    # not tilde-expand.
+    # Inputs nur über env in die Shell, nie per ${{ }} in Skripttext
+    # (Injection). Pfad aus $HOME, weil "~" gequotet nicht expandiert.
     - name: Init deploy key
       id: ssh_keys
       env:
@@ -80,9 +77,8 @@ runs:
         HOSTVAR: ${{ inputs.hostvar }}
       run: |
         PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
-        # Older ssh-keyscan exits 0 even when it reaches nothing, so check the
-        # output too; an empty known_hosts would only surface later as an
-        # opaque "Host key verification failed".
+        # Alte ssh-keyscan-Versionen enden auch ohne Ergebnis mit Exit 0;
+        # leere known_hosts fiele erst später opak auf.
         ssh-keyscan -p "$SSH_PORT" "$SERVER_IP" > "$RUNNER_TEMP/keyscan" \
           || { echo "::error::ssh-connect: ssh-keyscan failed for $SERVER_IP:$SSH_PORT - host unreachable or no sshd listening"; exit 1; }
         [ -s "$RUNNER_TEMP/keyscan" ] \
