@@ -2,6 +2,8 @@ name: Build idp-server Image
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_call:
@@ -65,5 +67,9 @@ jobs:
       - name: Tag version release
         if: startsWith(github.ref, 'refs/tags/v')
         run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
+      # main ist protected — ein Push dorthin ist immer ein PR-Merge.
+      - name: Tag image as latest on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:latest
       - name: Push tag to ghcr.io
         run: docker push --all-tags ghcr.io/${{ github.repository }}
