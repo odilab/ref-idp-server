@@ -9,13 +9,11 @@ inputs:
     required: true
     description: "ssh_config Host alias to define (use it as DOCKER_HOST=ssh://<alias>); not resolved via DNS"
   username:
-    required: false
-    description: "The SSH Username (odilab on the erp-service-dev fleet; the root default suits no odilab host)"
-    default: "root"
+    required: true
+    description: "The SSH Username (odilab on the erp-service-dev fleet); no default, an empty value fails validation"
   port:
-    required: false
-    description: "The SSH Port (2222 on the erp-service-dev fleet; the 22 default suits no odilab host)"
-    default: "22"
+    required: true
+    description: "The SSH Port (2222 on the erp-service-dev fleet); no default, an empty value fails validation"
   server_ip:
     required: true
     description: "The SSH Server IP"
@@ -41,11 +39,15 @@ runs:
       shell: bash
       env:
         HOSTVAR: ${{ inputs.hostvar }}
+        SSH_USER: ${{ inputs.username }}
+        SSH_PORT: ${{ inputs.port }}
         SERVER_IP: ${{ inputs.server_ip }}
         SSH_KEY: ${{ inputs.ssh_key }}
       run: |
         fail=0
-        [ -n "$HOSTVAR" ] || { echo "::error::ssh-connect: input 'hostvar' is empty"; fail=1; }
+        [ -n "$HOSTVAR" ] || { echo "::error::ssh-connect: input 'hostvar' is empty - is the SSH_HOST repo variable set?"; fail=1; }
+        [ -n "$SSH_USER" ] || { echo "::error::ssh-connect: input 'username' is empty - is the SSH_USER repo variable set?"; fail=1; }
+        [ -n "$SSH_PORT" ] || { echo "::error::ssh-connect: input 'port' is empty - is the SSH_PORT repo variable set?"; fail=1; }
         [ -n "$SERVER_IP" ] || { echo "::error::ssh-connect: input 'server_ip' is empty - is the SERVER_IP repo variable set?"; fail=1; }
         [ -n "$SSH_KEY" ] || { echo "::error::ssh-connect: input 'ssh_key' is empty - is the DEPLOYMENT_KEY secret set?"; fail=1; }
         exit "$fail"

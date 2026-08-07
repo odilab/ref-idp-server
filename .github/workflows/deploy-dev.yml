@@ -32,9 +32,11 @@ jobs:
       packages: read
     runs-on: ubuntu-latest
     env:
-      SSH_HOST: ${{ vars.SSH_HOST || 'erp-service-dev' }}
-      SSH_USER: ${{ vars.SSH_USER || 'odilab' }}
-      SSH_PORT: ${{ vars.SSH_PORT || '2222' }}
+      # No fallbacks, per landscape convention: an unset repo variable must
+      # fail visibly (the ssh-connect validate step names the missing one).
+      SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_USER: ${{ vars.SSH_USER }}
+      SSH_PORT: ${{ vars.SSH_PORT }}
     steps:
       - uses: actions/checkout@v6
       - name: Login ghcr.io
