@@ -66,5 +66,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
       - name: Push tag to ghcr.io
-        if: ${{ github.actor != 'dependabot[bot]' }}
         run: docker push --all-tags ghcr.io/${{ github.repository }}

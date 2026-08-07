@@ -7,7 +7,9 @@ on:
 
 jobs:
   build:
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    # Same-repo PRs only: a fork PR gets no secrets and a read-only
+    # GITHUB_TOKEN, so both jobs could only fail. Skip them cleanly.
+    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     permissions:
       contents: read
       packages: write
@@ -15,7 +17,7 @@ jobs:
     # which is always passed to called workflows. DEPLOYMENT_KEY stays here.
     uses: ./.github/workflows/build-image.yml
   deploy:
-    if: ${{ github.actor != 'dependabot[bot]'}}
+    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     needs: [ build ]
     # Serialize deploys: two quick pushes must not race `docker compose up`
     # against the same DOCKER_HOST.
@@ -72,7 +74,6 @@ jobs:
           # --remove-orphans prunes only services absent from this file, so the
           # shared proxy survives — until someone removes or renames it here.
           docker pull ${{ env.IDP_SERVER_IMAGE }}
-          IDP_SERVER_IMAGE=${{ env.IDP_SERVER_IMAGE }} \
           docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans
       # The upstream Dockerfile runs the server as uid 10000, so the p12s in
       # the shared volume must be world-readable. Re-seeding erp-credentials
