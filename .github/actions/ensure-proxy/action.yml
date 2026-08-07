@@ -1,0 +1,40 @@
+name: Ensure Shared Proxy
+description: >-
+  Idempotently ensure the shared 'proxy' network and a Traefik reverse proxy
+  exist on the remote Docker host. Safe to call before every app deploy.
+author: odilab
+inputs:
+  ssh_auth_sock:
+    required: true
+    description: "SSH_AUTH_SOCK from the ssh-connect action"
+  docker_host:
+    required: true
+    description: "DOCKER_HOST, e.g. ssh://<alias>"
+runs:
+  using: composite
+  steps:
+    # Composite-Actions erzwingen `required: true` nicht; ungesetzte Inputs
+    # kommen als "" an. DOCKER_HOST="" faellt still auf den lokalen Docker
+    # zurueck — hier benannt fehlschlagen statt auf dem Runner zu deployen.
+    - name: Validate inputs
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ inputs.ssh_auth_sock }}
+        DOCKER_HOST: ${{ inputs.docker_host }}
+      run: |
+        fail=0
+        [ -n "$DOCKER_HOST" ] || { echo "::error::ensure-proxy: input 'docker_host' is empty"; fail=1; }
+        [ -n "$SSH_AUTH_SOCK" ] || { echo "::error::ensure-proxy: input 'ssh_auth_sock' is empty"; fail=1; }
+        exit "$fail"
+    - name: Ensure shared network and Traefik
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ inputs.ssh_auth_sock }}
+        DOCKER_HOST: ${{ inputs.docker_host }}
+        COMPOSE_FILE: ${{ github.action_path }}/compose-proxy.yml
+      run: |
+        set -euo pipefail
+        # Externes Netz out-of-band anlegen; kein `down` zerstoert es dann.
+        docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
+        # up -d ist idempotent: laeuft Traefik schon unveraendert, bleibt er stehen.
+        docker compose -f "$COMPOSE_FILE" up -d
