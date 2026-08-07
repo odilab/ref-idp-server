@@ -55,6 +55,7 @@ jobs:
         with:
           ssh_auth_sock: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
           docker_host: ssh://${{ env.SSH_HOST }}
+          acme_email: ${{ vars.ACME_EMAIL }}
       - name: Deploy IDP-Server
         id: deploy-compose
         env:
