@@ -19,9 +19,6 @@ The **IDP-Global** project consists of various sub-projects. These are
 
 https://hub.docker.com/r/gematik1/idp-server
 
-> **odilab fork:** this fork additionally publishes `ghcr.io/odilab/ref-idp-server:<short-sha>`
-> and runs a shared dev deployment. See [DEPLOYMENT.md](DEPLOYMENT.md).
-
 #### Build image of Idp-Server, 2 examples
 
 in project root:
