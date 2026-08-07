@@ -1,6 +1,9 @@
 name: Build idp-server Image
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
   workflow_call:
     outputs:
       commit_tag:
