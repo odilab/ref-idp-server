@@ -10,21 +10,29 @@ inputs:
   docker_host:
     required: true
     description: "DOCKER_HOST, e.g. ssh://<alias>"
+  acme_email:
+    required: true
+    description: "ACME account email for Let's Encrypt (no default; provide via env/secret)"
+  acme_storage:
+    required: false
+    default: "/letsencrypt/acme.json"
+    description: "ACME certificate storage path inside the Traefik container"
 runs:
   using: composite
   steps:
-    # Composite-Actions erzwingen `required: true` nicht; ungesetzte Inputs
-    # kommen als "" an. DOCKER_HOST="" faellt still auf den lokalen Docker
-    # zurueck — hier benannt fehlschlagen statt auf dem Runner zu deployen.
+    # Composite-Actions erzwingen `required` nicht: ein leeres DOCKER_HOST
+    # wuerde still auf den lokalen Docker des Runners statt den Host deployen.
     - name: Validate inputs
       shell: bash
       env:
         SSH_AUTH_SOCK: ${{ inputs.ssh_auth_sock }}
         DOCKER_HOST: ${{ inputs.docker_host }}
+        ACME_EMAIL: ${{ inputs.acme_email }}
       run: |
         fail=0
         [ -n "$DOCKER_HOST" ] || { echo "::error::ensure-proxy: input 'docker_host' is empty"; fail=1; }
         [ -n "$SSH_AUTH_SOCK" ] || { echo "::error::ensure-proxy: input 'ssh_auth_sock' is empty"; fail=1; }
+        [ -n "$ACME_EMAIL" ] || { echo "::error::ensure-proxy: input 'acme_email' is empty"; fail=1; }
         exit "$fail"
     - name: Ensure shared network and Traefik
       shell: bash
@@ -32,9 +40,9 @@ runs:
         SSH_AUTH_SOCK: ${{ inputs.ssh_auth_sock }}
         DOCKER_HOST: ${{ inputs.docker_host }}
         COMPOSE_FILE: ${{ github.action_path }}/compose-proxy.yml
+        TRAEFIK_ACME_EMAIL: ${{ inputs.acme_email }}
+        TRAEFIK_ACME_STORAGE: ${{ inputs.acme_storage }}
       run: |
         set -euo pipefail
-        # Externes Netz out-of-band anlegen; kein `down` zerstoert es dann.
         docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
-        # up -d ist idempotent: laeuft Traefik schon unveraendert, bleibt er stehen.
         docker compose -f "$COMPOSE_FILE" up -d

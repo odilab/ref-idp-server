@@ -1,6 +1,5 @@
 # Standalone-Traefik: geteilter Ingress fuer den Dev-Host.
 # Projektname `proxy` isoliert ihn von jedem App-Stack.
-# Wird idempotent von der ensure-proxy-Action deployt.
 name: proxy
 
 services:
@@ -15,16 +14,15 @@ services:
       - "--accesslog=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      # Default-Netz fuer die Backend-IP-Aufloesung; Apps muessen so das
-      # traefik.docker.network-Label nicht zwingend setzen.
+      # Default-Netz, damit Apps kein traefik.docker.network-Label brauchen.
       - "--providers.docker.network=proxy"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--certificatesresolvers.erp-service.acme.tlschallenge=true"
-      - "--certificatesresolvers.erp-service.acme.email=hostmaster@optadata-innovationlab.de"
-      - "--certificatesresolvers.erp-service.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.erp-service.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.erp-service.acme.storage=${TRAEFIK_ACME_STORAGE}"
     ports:
       - "80:80"
       - "443:443"
@@ -32,8 +30,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /letsencrypt:/letsencrypt
 
-# Extern: von der ensure-proxy-Action out-of-band angelegt.
-# Kein `down` eines App-Stacks zerstoert es dann.
+# Out-of-band von der Action angelegt; ein App-`down` nimmt es nicht mit.
 networks:
   proxy:
     external: true
