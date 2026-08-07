@@ -34,13 +34,27 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v6
+    # Composite actions do not enforce `required: true`, and an unset secret
+    # or repo variable expands to "". Fail here with a named cause instead of
+    # skipping silently and letting a later docker/ssh step fail opaquely.
+    - name: Validate inputs
+      shell: bash
+      env:
+        HOSTVAR: ${{ inputs.hostvar }}
+        SERVER_IP: ${{ inputs.server_ip }}
+        SSH_KEY: ${{ inputs.ssh_key }}
+      run: |
+        fail=0
+        [ -n "$HOSTVAR" ] || { echo "::error::ssh-connect: input 'hostvar' is empty"; fail=1; }
+        [ -n "$SERVER_IP" ] || { echo "::error::ssh-connect: input 'server_ip' is empty - is the SERVER_IP repo variable set?"; fail=1; }
+        [ -n "$SSH_KEY" ] || { echo "::error::ssh-connect: input 'ssh_key' is empty - is the DEPLOYMENT_KEY secret set?"; fail=1; }
+        exit "$fail"
     # Inputs reach the shell only via env; nothing is ${{ }}-interpolated into
     # script text, so a crafted or multi-line value cannot become shell code.
     # The key path is set in-script from $HOME because a quoted "$VAR" does
     # not tilde-expand.
     - name: Init deploy key
       id: ssh_keys
-      if: ${{ inputs.ssh_key }}
       env:
         PRIVATE_KEY: ${{ inputs.ssh_key }}
       shell: bash
@@ -48,11 +62,14 @@ runs:
         PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
-        printf '%s' "$PRIVATE_KEY" | base64 -d > "$PRIVATE_KEY_PATH" && chmod 600 "$PRIVATE_KEY_PATH"
-        ssh-keygen -f "$PRIVATE_KEY_PATH" -y > "$PRIVATE_KEY_PATH.pub" && chmod 644 "$PRIVATE_KEY_PATH.pub"
+        printf '%s' "$PRIVATE_KEY" | base64 -d > "$PRIVATE_KEY_PATH" \
+          || { echo "::error::ssh-connect: ssh_key does not decode as base64"; exit 1; }
+        chmod 600 "$PRIVATE_KEY_PATH"
+        ssh-keygen -f "$PRIVATE_KEY_PATH" -y > "$PRIVATE_KEY_PATH.pub" \
+          || { echo "::error::ssh-connect: decoded ssh_key is not a usable private key"; exit 1; }
+        chmod 644 "$PRIVATE_KEY_PATH.pub"
     - name: Write SSH config
       id: write-ssh-config
-      if: ${{ inputs.ssh_key }}
       shell: bash
       env:
         SSH_USER: ${{ inputs.username }}
@@ -61,14 +78,20 @@ runs:
         HOSTVAR: ${{ inputs.hostvar }}
       run: |
         PRIVATE_KEY_PATH="$HOME/.ssh/id_deploy"
-        ssh-keyscan -p "$SSH_PORT" "$SERVER_IP" >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+        # Older ssh-keyscan exits 0 even when it reaches nothing, so check the
+        # output too; an empty known_hosts would only surface later as an
+        # opaque "Host key verification failed".
+        ssh-keyscan -p "$SSH_PORT" "$SERVER_IP" > "$RUNNER_TEMP/keyscan" \
+          || { echo "::error::ssh-connect: ssh-keyscan failed for $SERVER_IP:$SSH_PORT - host unreachable or no sshd listening"; exit 1; }
+        [ -s "$RUNNER_TEMP/keyscan" ] \
+          || { echo "::error::ssh-connect: ssh-keyscan returned no host keys for $SERVER_IP:$SSH_PORT"; exit 1; }
+        cat "$RUNNER_TEMP/keyscan" >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
         echo "Host $HOSTVAR" > ~/.ssh/config
         echo "  HostName $SERVER_IP" >> ~/.ssh/config
         echo "  User $SSH_USER" >> ~/.ssh/config
         echo "  Port $SSH_PORT" >> ~/.ssh/config
         echo "  IdentityFile $PRIVATE_KEY_PATH" >> ~/.ssh/config
     - name: Eval Agent
-      if: ${{ inputs.ssh_key }}
       id: ssh-agent
       shell: bash
       env:
