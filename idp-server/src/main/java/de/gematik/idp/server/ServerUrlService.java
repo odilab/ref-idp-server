@@ -39,7 +39,8 @@ public class ServerUrlService {
 
   public String determineServerUrl(final HttpServletRequest request) {
     return getServerUrlFromConfig()
-        .orElse(request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort());
+        .orElse(
+            request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort());
   }
 
   public String determineServerUrl() {
@@ -49,7 +50,7 @@ public class ServerUrlService {
   public String determineServerUrlRuntime() {
     return getServerUrlFromConfig().orElse(getServerUrlLocalInstance());
   }
-  
+
   public String determineServerUrlConfigured() {
     return getServerUrlFromConfig().orElse(DEFAULT_SERVER_URL);
   }
