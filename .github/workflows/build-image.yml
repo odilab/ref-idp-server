@@ -28,8 +28,8 @@ jobs:
       packages: write
     runs-on: ubuntu-latest
     outputs:
-      commit_tag: ${{ steps.commit-tag.outputs.tag }}
-      image: ${{ steps.commit-tag.outputs.image }}
+      commit_tag: ${{ steps.meta.outputs.tag }}
+      image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v6
       - name: Login ghcr.io
@@ -44,37 +44,46 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      - name: Build Image
-        run: mvn clean package -pl idp-server -am -Dskip.unittests -Dskip.inttests -Dskip.dockerbuild=false
-      - name: Resolve built image tag
-        id: built-image
-        run: |
-          SOURCE_IMAGE=$(docker images --filter "reference=local/idm/idp-server:*" --format '{{.Repository}}:{{.Tag}}' | head -n 1)
-          if [ -z "${SOURCE_IMAGE}" ]; then
-            echo "No local/idm/idp-server image found after Maven build"
-            exit 1
-          fi
-          echo "image=${SOURCE_IMAGE}" >> $GITHUB_OUTPUT
-      - name: Tag commit
-        id: commit-tag
+      # Baut nur das Jar; skip.dockerbuild bleibt auf seinem Default true,
+      # das Image entsteht unten via buildx aus .github/docker/Dockerfile.
+      - name: Build Jar
+        run: mvn clean package -pl idp-server -am -Dskip.unittests -Dskip.inttests
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Compute tags and platforms
+        id: meta
         run: |
           COMMIT_TAG=$(git rev-parse --short HEAD)
           IMAGE_REPO="ghcr.io/${{ github.repository }}"
-          docker tag ${{ steps.built-image.outputs.image }} ${IMAGE_REPO}:${COMMIT_TAG}
+          TAG_ARGS="--tag ${IMAGE_REPO}:${COMMIT_TAG}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:pr-${{ github.event.pull_request.number }}"
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:test"
+          fi
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:${GITHUB_REF#refs/tags/}"
+          fi
+          # main ist protected — ein Push dorthin ist immer ein PR-Merge.
+          # Nur dort wird multi-arch gebaut; Dev-Builds bleiben amd64-only.
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:latest"
+            PLATFORMS="linux/amd64,linux/arm64"
+          else
+            PLATFORMS="linux/amd64"
+          fi
           echo "tag=${COMMIT_TAG}" >> $GITHUB_OUTPUT
           echo "image=${IMAGE_REPO}:${COMMIT_TAG}" >> $GITHUB_OUTPUT
-      - name: Tag image with PR number
-        if: github.event_name == 'pull_request'
-        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}
-      - name: Tag image as test for workflow_dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:test
-      - name: Tag version release
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
-      # main ist protected — ein Push dorthin ist immer ein PR-Merge.
-      - name: Tag image as latest on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: docker tag ${{ steps.built-image.outputs.image }} ghcr.io/${{ github.repository }}:latest
-      - name: Push tag to ghcr.io
-        run: docker push --all-tags ghcr.io/${{ github.repository }}
+          echo "tag_args=${TAG_ARGS}" >> $GITHUB_OUTPUT
+          echo "platforms=${PLATFORMS}" >> $GITHUB_OUTPUT
+      - name: Build and push image
+        run: >-
+          docker buildx build
+          --push
+          --platform ${{ steps.meta.outputs.platforms }}
+          --file .github/docker/Dockerfile
+          --build-arg COMMIT_HASH=${{ github.sha }}
+          --build-arg VERSION=${{ steps.meta.outputs.tag }}
+          ${{ steps.meta.outputs.tag_args }}
+          idp-server/target
