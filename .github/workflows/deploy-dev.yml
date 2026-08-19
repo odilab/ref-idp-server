@@ -56,25 +56,21 @@ jobs:
           ssh_auth_sock: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
           docker_host: ssh://${{ env.SSH_HOST }}
           acme_email: ${{ vars.ACME_EMAIL }}
-      - name: Deploy IDP-Server
+      - name: Deploy and verify IDP-Server
         id: deploy-compose
         env:
           SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
           DOCKER_HOST: ssh://${{ env.SSH_HOST }}
           COMPOSE_FILE: docker-compose-dev.yml
           IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
-          # Credential-Pfade: Defaults in docker-compose-dev.yml genuegen.
-          # Benanntes externes Volume (kein Pfad), geseedet vom Stack odilab/erp-credentials.
           CREDENTIALS_SOURCE: erp-credentials
           IDP_SERVER_URL: https://${{ env.DEPLOY_HOSTNAME }}
         run: |
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d --pull always --remove-orphans
-      # Upstream-Image läuft als uid 10000; die p12s müssen dafür lesbar sein.
-      # Beim Re-Seeden schon einmal gebrochen — lieber hier scheitern als beim p12-Load.
-      - name: Verify uid 10000 can read credentials
-        env:
-          SSH_AUTH_SOCK: ${{ steps.ssh-connect.outputs.ssh_auth_sock }}
-          DOCKER_HOST: ssh://${{ env.SSH_HOST }}
-        run: |
-          docker run --rm -u 10000:10000 -v erp-credentials:/credentials:ro alpine:3.20 \
-            sh -c 'id -u && cat /credentials/idp_sig.p12 /credentials/idp_enc.p12 /credentials/disc_sig.p12 > /dev/null && echo credentials readable'
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d --pull always --remove-orphans --wait --wait-timeout 120 \
+          || {
+            echo "::error::Container unhealthy after 120s"
+            docker exec idp-server cat /credentials/idp_sig.p12 /credentials/idp_enc.p12 /credentials/disc_sig.p12 > /dev/null \
+              && echo "Credentials readable — startup failure is not credential-related" \
+              || echo "::error::Credentials unreadable for uid 10000"
+            exit 1
+          }
