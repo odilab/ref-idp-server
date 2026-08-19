@@ -1,20 +1,13 @@
-x-environment-timezone: &environment-timezone-ref
-  TZ: Europe/Berlin
-
-x-service-setup: &service-setup-ref
-  restart: always
-
-x-service-network: &service-network-ref
-  networks:
-    proxy:
-
 services:
   idpserver:
     image: ${IDP_SERVER_IMAGE:-ghcr.io/odilab/ref-idp-server:latest}
     user: 10000:10000
     container_name: idp-server
-    <<: [*service-network-ref, *service-setup-ref]
+    restart: always
+    networks:
+      proxy:
     environment:
+      TZ: Europe/Berlin
       # Default: OrbStack-Hostname für lokale Läufe; das Deploy setzt die
       # öffentliche URL. Der Wert landet 1:1 im Discovery-Dokument.
       IDP_SERVER_URL: "${IDP_SERVER_URL:-https://idp-server.ref-idp-server.orb.local}"
@@ -29,11 +22,10 @@ services:
       # https statt des http-Defaults der application.yml; muss exakt dem
       # redirect_uri der App entsprechen, sonst 1020 an /sign_response.
       IDP_REGISTEREDCLIENT_EREZEPTAPP_REDIRECTURI: "https://redirect.gematik.de/erezept"
-      MANAGEMENT_PORT: 8180 # Spring Actuator Port
+      MANAGEMENT_PORT: 8180
       # Defense-in-depth: application.yml aktiviert die H2-Console samt
       # web-allow-others — sie antwortete sonst jedem Container im Netz.
       SPRING_H2_CONSOLE_ENABLED: "false"
-      <<: *environment-timezone-ref
     # Deploy: benanntes externes Volume erp-credentials. Lokal: Bind-Pfad —
     # relative Pfade löst der Compose-Client auf, nicht der remote Docker-Host.
     volumes:

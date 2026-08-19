@@ -15,7 +15,6 @@ jobs:
     # Kein secrets:inherit — der Build braucht nur den automatischen GITHUB_TOKEN.
     uses: ./.github/workflows/build-image.yml
   deploy:
-    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     needs: [ build ]
     # Serialisiert Deploys gegen denselben Host.
     concurrency:
@@ -63,19 +62,12 @@ jobs:
           DOCKER_HOST: ssh://${{ env.SSH_HOST }}
           COMPOSE_FILE: docker-compose-dev.yml
           IDP_SERVER_IMAGE: ${{ needs.build.outputs.image }}
-          IDP_IDPSIG_FILENAME: file:/credentials/idp_sig.p12
-          IDP_IDPENC_FILENAME: file:/credentials/idp_enc.p12
-          IDP_DISCSIG_FILENAME: file:/credentials/disc_sig.p12
+          # Credential-Pfade: Defaults in docker-compose-dev.yml genuegen.
           # Benanntes externes Volume (kein Pfad), geseedet vom Stack odilab/erp-credentials.
           CREDENTIALS_SOURCE: erp-credentials
           IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
         run: |
-          # Traefik ist ein eigener Stack (Projekt `proxy`), von hier entkoppelt.
-          # Kein `down`: `up -d` legt den idp-server wegen des neuen Image-Tags
-          # ohnehin neu an; --remove-orphans räumt nur Services ab, die nicht
-          # mehr in dieser App-Compose stehen.
-          docker pull ${{ env.IDP_SERVER_IMAGE }}
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d --pull always --remove-orphans
       # Upstream-Image läuft als uid 10000; die p12s müssen dafür lesbar sein.
       # Beim Re-Seeden schon einmal gebrochen — lieber hier scheitern als beim p12-Load.
       - name: Verify uid 10000 can read credentials
