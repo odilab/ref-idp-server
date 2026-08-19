@@ -22,7 +22,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: dev
-      url: https://dev-idp.optadata-innovationlab.de/swagger-ui/index.html
+      url: https://${{ env.DEPLOY_HOSTNAME }}/swagger-ui/index.html
     permissions:
       contents: read
       packages: read
@@ -33,6 +33,7 @@ jobs:
       SSH_HOST: ${{ vars.SSH_HOST }}
       SSH_USER: ${{ vars.SSH_USER }}
       SSH_PORT: ${{ vars.SSH_PORT }}
+      DEPLOY_HOSTNAME: dev-idp.optadata-innovationlab.de
     steps:
       - uses: actions/checkout@v6
       - name: Login ghcr.io
@@ -65,7 +66,7 @@ jobs:
           # Credential-Pfade: Defaults in docker-compose-dev.yml genuegen.
           # Benanntes externes Volume (kein Pfad), geseedet vom Stack odilab/erp-credentials.
           CREDENTIALS_SOURCE: erp-credentials
-          IDP_SERVER_URL: https://dev-idp.optadata-innovationlab.de
+          IDP_SERVER_URL: https://${{ env.DEPLOY_HOSTNAME }}
         run: |
           docker compose -f ${{ env.COMPOSE_FILE }} up -d --pull always --remove-orphans
       # Upstream-Image läuft als uid 10000; die p12s müssen dafür lesbar sein.
