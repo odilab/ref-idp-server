@@ -30,8 +30,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
     # Composite-Actions erzwingen `required: true` nicht; ungesetzte
     # Secrets/Variablen kommen als "" an. Hier benannt fehlschlagen.
     - name: Validate inputs
