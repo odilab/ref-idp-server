@@ -54,22 +54,22 @@ jobs:
           COMMIT_TAG=$(git rev-parse --short HEAD)
           IMAGE_REPO="ghcr.io/${{ github.repository }}"
           TAG_ARGS="--tag ${IMAGE_REPO}:${COMMIT_TAG}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:pr-${{ github.event.pull_request.number }}"
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:test"
-          fi
+          PLATFORMS="linux/amd64"
           # main ist protected — ein Push dorthin ist immer ein PR-Merge.
           # Nur dort wird multi-arch gebaut; Dev-Builds bleiben amd64-only.
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:latest"
-            VERSION=$(basename idp-server/target/idp-server-*.jar .jar | sed 's/^idp-server-//')
-            TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:${VERSION}"
-            PLATFORMS="linux/amd64,linux/arm64"
-          else
-            PLATFORMS="linux/amd64"
-          fi
+          case "${{ github.event_name }}" in
+            pull_request)
+              TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:pr-${{ github.event.pull_request.number }}" ;;
+            workflow_dispatch)
+              TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:test" ;;
+            push)
+              if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+                TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:latest"
+                VERSION=$(basename idp-server/target/idp-server-*.jar .jar | sed 's/^idp-server-//')
+                TAG_ARGS="${TAG_ARGS} --tag ${IMAGE_REPO}:${VERSION}"
+                PLATFORMS="linux/amd64,linux/arm64"
+              fi ;;
+          esac
           echo "tag=${COMMIT_TAG}" >> $GITHUB_OUTPUT
           echo "image=${IMAGE_REPO}:${COMMIT_TAG}" >> $GITHUB_OUTPUT
           echo "tag_args=${TAG_ARGS}" >> $GITHUB_OUTPUT
