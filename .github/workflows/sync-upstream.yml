@@ -1,0 +1,46 @@
+name: Sync upstream (gematik)
+on:
+  schedule:
+    # Montags 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Sync fork master
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MERGE_TYPE=$(gh api repos/${{ github.repository }}/merge-upstream \
+            -f branch=master --jq '.merge_type' 2>/dev/null) || true
+          echo "merge_type=${MERGE_TYPE:-none}" >> $GITHUB_OUTPUT
+          echo "merge-upstream: ${MERGE_TYPE:-none}"
+
+      - name: Create sync PR
+        if: steps.sync.outputs.merge_type != 'none'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh pr list --repo ${{ github.repository }} \
+            --base main --head master --state open \
+            --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "Offene Sync-PR #${EXISTING} existiert"
+            exit 0
+          fi
+          SUBJECT=$(gh api repos/${{ github.repository }}/branches/master \
+            --jq '.commit.commit.message' | head -1)
+          PR_URL=$(gh pr create \
+            --repo ${{ github.repository }} \
+            --base main \
+            --head master \
+            --title "Upstream-Sync: ${SUBJECT}" \
+            --body "Automatischer Sync von gematik/ref-idp-server master.")
+          echo "PR erstellt: ${PR_URL}"
+          gh pr merge --auto --merge "${PR_URL}"
