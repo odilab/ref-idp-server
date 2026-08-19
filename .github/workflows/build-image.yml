@@ -82,5 +82,7 @@ jobs:
           --file .github/docker/Dockerfile
           --build-arg COMMIT_HASH=${{ github.sha }}
           --build-arg VERSION=${{ steps.meta.outputs.tag }}
+          --cache-from type=gha
+          --cache-to type=gha,mode=max
           ${{ steps.meta.outputs.tag_args }}
           idp-server/target
