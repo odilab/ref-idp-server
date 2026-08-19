@@ -37,7 +37,7 @@ services:
       # es nie. Bei neuen Endpunkten erweitern. Bewusst nicht geroutet:
       # /h2-console und Actuator (Port 8180). Kein Host-Port — einziger Ingress.
       - >-
-        traefik.http.routers.idp-server.rule=Host(`dev-idp.optadata-innovationlab.de`) &&
+        traefik.http.routers.idp-server.rule=Host(`${DEPLOY_HOSTNAME:-dev-idp.optadata-innovationlab.de}`) &&
         (Path(`/.well-known/openid-configuration`) || Path(`/discoveryDocument`) ||
         Path(`/auth/realms/idp/.well-known/openid-configuration`) || Path(`/jwks`) ||
         Path(`/idpSig/jwk.json`) || Path(`/idpEnc/jwk.json`) ||
